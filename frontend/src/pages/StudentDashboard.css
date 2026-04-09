@@ -1,0 +1,447 @@
+/* src/pages/StudentDashboard.css */
+.student-container {
+  padding: 2rem;
+}
+
+/* 강좌 목록 */
+.section-title {
+  font-size: 1rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lecture-list {
+  margin-bottom: 2rem;
+}
+
+.lecture-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.lecture-card {
+  text-align: left;
+  padding: 1.2rem;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 2px solid transparent;
+  width: 100%;
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-color: var(--card-border);
+}
+
+.lecture-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.lecture-card.active {
+  border-color: var(--lec-color);
+  box-shadow: 0 0 0 1px var(--lec-color), 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.lec-subject {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lec-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0.4rem 0 0.2rem;
+  line-height: 1.4;
+}
+
+.lec-episode {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.lec-progress-bar {
+  height: 4px;
+  background: var(--card-border);
+  border-radius: 2px;
+  margin-top: 0.8rem;
+}
+
+.lec-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* 헤더 */
+.student-header {
+  margin-bottom: 1.5rem;
+}
+
+.student-header h2 {
+  font-size: 1.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+/* 탭 이탈 경고 */
+.tab-warning-banner {
+  background: #ef4444;
+  color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+/* 플레이어 레이아웃 */
+.player-layout {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 2rem;
+}
+
+.video-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.video-player {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #000;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* YouTube iframe */
+.yt-iframe-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.yt-iframe-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* 강의 시작 오버레이 */
+.start-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 10;
+  border-radius: 12px;
+}
+
+.start-session-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  background: transparent;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 12px;
+  padding: 1.5rem 2.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.start-session-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.6);
+}
+
+.play-icon {
+  font-size: 2.5rem;
+}
+
+.session-active-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.session-timer {
+  font-size: 3rem;
+  font-weight: 700;
+  color: white;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-label {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.9rem;
+}
+
+/* 컨트롤 바 */
+.video-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.time-display {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.control-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--card-border);
+  border-radius: 3px;
+  min-width: 60px;
+}
+
+.filled-bar {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.5s linear;
+}
+
+.control-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.warn-btn {
+  background: transparent;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.warn-btn:hover:not(:disabled) {
+  background: #ef4444;
+  color: white;
+}
+
+.warn-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.end-btn {
+  background: var(--primary);
+  border: none;
+  color: white;
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.end-btn:hover {
+  background: var(--primary-hover);
+}
+
+/* 사이드바 */
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.webcam-box {
+  padding: 1rem;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.cam-placeholder {
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  position: relative;
+  margin-bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cam-icon {
+  font-size: 3.5rem;
+  opacity: 0.4;
+}
+
+.bounding-box {
+  position: absolute;
+  top: 20%;
+  left: 20%;
+  width: 60%;
+  height: 60%;
+  border: 2px dashed #22c55e;
+  border-radius: 8px;
+  transition: border-color 0.3s;
+}
+
+.dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #22c55e;
+  border-radius: 50%;
+  transition: background 0.3s;
+}
+
+.cam-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: blink 1.5s infinite;
+  transition: background 0.3s;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* 집중도 미터 */
+.focus-meter {
+  padding: 1.2rem;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.focus-meter h3 {
+  font-size: 0.95rem;
+  margin-bottom: 0.8rem;
+}
+
+.meter-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.meter-circle {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.5s;
+}
+
+.inner-circle {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: var(--bg-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.status-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: color 0.3s;
+}
+
+/* 세션 통계 */
+.session-stats {
+  padding: 1rem 1.2rem;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-around;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.stat-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* 반응형 */
+@media (max-width: 900px) {
+  .player-layout {
+    grid-template-columns: 1fr;
+  }
+  .sidebar-section {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .webcam-box, .focus-meter, .session-stats {
+    flex: 1 1 calc(50% - 0.6rem);
+  }
+}
+
+@media (max-width: 700px) {
+  .lecture-cards {
+    grid-template-columns: 1fr;
+  }
+  .sidebar-section {
+    flex-direction: column;
+  }
+}
