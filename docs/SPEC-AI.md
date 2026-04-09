@@ -128,7 +128,7 @@ const model = await tf.loadLayersModel('/model/model.json');
 
 async function classifyAttention(faceImageData) {
   const tensor = tf.browser.fromPixels(faceImageData)
-    .resizeBilinear([640, 640])  // 모델 입력 크기 (PLANNING.md의 imgsz: 640 참고)
+    .resizeBilinear([224, 224])  // 모델 입력 크기 (MobileNetV3Large: 224x224)
     .expandDims(0)
     .toFloat()
     .div(255.0);
