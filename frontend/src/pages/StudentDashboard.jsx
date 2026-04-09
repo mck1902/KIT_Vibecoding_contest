@@ -1,7 +1,10 @@
 /* 2026-04-09: YouTube iframe 연동 + 세션 데이터 백엔드 연결 */
+/* TF.js 실제 추론 연동: 웹캠 → 얼굴 감지 → MobileNetV3 분류 */
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import lectures from '../data/lectures.json';
+import useWebcam from '../hooks/useWebcam';
+import useAttentionAnalysis from '../hooks/useAttentionAnalysis';
 import './StudentDashboard.css';
 
 const STATUS_MAP = {
@@ -15,8 +18,6 @@ const STATUS_MAP = {
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const [selectedLecture, setSelectedLecture] = useState(lectures[0]);
-  const [focusLevel, setFocusLevel] = useState(85);
-  const [focusStatus, setFocusStatus] = useState(1);
   const [tabWarning, setTabWarning] = useState(false);
   const [departureCount, setDepartureCount] = useState(0);
   const [sessionStarted, setSessionStarted] = useState(false);
@@ -33,6 +34,24 @@ const StudentDashboard = () => {
   const focusStatusRef = useRef(1);
   const focusLevelRef = useRef(85);
   const tabLeaveTimeRef = useRef(null);
+
+  // 웹캠 + AI 분석 훅
+  const webcam = useWebcam();
+  const analysis = useAttentionAnalysis(webcam.captureFrame, webcam.isActive);
+
+  // AI 분석 결과를 refs에 동기화 (백엔드 전송용)
+  const focusStatus = tabWarning ? 4 : analysis.currentStatus;
+  const focusLevel = tabWarning ? 45 : analysis.focusLevel;
+
+  useEffect(() => {
+    focusStatusRef.current = focusStatus;
+    focusLevelRef.current = focusLevel;
+  }, [focusStatus, focusLevel]);
+
+  // 컴포넌트 마운트 시 모델 사전 로딩
+  useEffect(() => {
+    analysis.loadModels();
+  }, []);
 
   // YouTube IFrame API 로드 및 플레이어 초기화
   useEffect(() => {
@@ -127,10 +146,6 @@ const StudentDashboard = () => {
         tabLeaveTimeRef.current = new Date();
         setTabWarning(true);
         setDepartureCount(prev => prev + 1);
-        setFocusStatus(4);
-        setFocusLevel(45);
-        focusStatusRef.current = 4;
-        focusLevelRef.current = 45;
       } else if (document.visibilityState === 'visible' && tabLeaveTimeRef.current) {
         const returnTime = new Date();
         const duration = returnTime - tabLeaveTimeRef.current;
@@ -150,10 +165,6 @@ const StudentDashboard = () => {
         tabLeaveTimeRef.current = null;
         setTimeout(() => {
           setTabWarning(false);
-          setFocusStatus(2);
-          setFocusLevel(80);
-          focusStatusRef.current = 2;
-          focusLevelRef.current = 80;
         }, 2000);
       }
     };
@@ -161,28 +172,27 @@ const StudentDashboard = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [sessionStarted]);
 
-  // 집중도 모의 변동 (AI 연동 전 fallback)
+  // 세션 시작/종료 시 웹캠 + AI 분석 제어
   useEffect(() => {
-    if (!sessionStarted) return;
-    const timer = setInterval(() => {
-      setFocusLevel(prev => {
-        if (tabWarning) return prev;
-        const diff = Math.floor(Math.random() * 7) - 3;
-        const next = Math.min(100, Math.max(0, prev + diff));
-        let status = 1;
-        if (next >= 80) status = 1;
-        else if (next >= 65) status = 2;
-        else if (next >= 50) status = 3;
-        else if (next >= 30) status = 4;
-        else status = 5;
-        setFocusStatus(status);
-        focusStatusRef.current = status;
-        focusLevelRef.current = next;
-        return next;
+    if (sessionStarted) {
+      webcam.start().then(() => {
+        // 웹캠이 준비되면 분석 시작 (모델 로딩 완료 시)
+        if (analysis.isModelLoaded) {
+          analysis.startAnalysis();
+        }
       });
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [sessionStarted, tabWarning]);
+    } else {
+      analysis.stopAnalysis();
+      webcam.stop();
+    }
+  }, [sessionStarted]);
+
+  // 모델 로딩 완료 후 세션 진행 중이면 분석 시작
+  useEffect(() => {
+    if (analysis.isModelLoaded && sessionStarted && webcam.isActive) {
+      analysis.startAnalysis();
+    }
+  }, [analysis.isModelLoaded, webcam.isActive]);
 
   // 세션 경과 시간
   useEffect(() => {
@@ -222,10 +232,6 @@ const StudentDashboard = () => {
     setElapsed(0);
     elapsedRef.current = 0;
     setDepartureCount(0);
-    setFocusLevel(85);
-    setFocusStatus(1);
-    focusStatusRef.current = 1;
-    focusLevelRef.current = 85;
 
     if (playerRef.current && playerReadyRef.current) {
       playerRef.current.playVideo();
@@ -233,6 +239,8 @@ const StudentDashboard = () => {
   };
 
   const handleEndSession = async () => {
+    analysis.stopAnalysis();
+    webcam.stop();
     if (playerRef.current && playerReadyRef.current) {
       playerRef.current.pauseVideo();
     }
@@ -248,12 +256,12 @@ const StudentDashboard = () => {
   };
 
   const handleLectureSelect = (lec) => {
+    analysis.stopAnalysis();
+    webcam.stop();
     setSelectedLecture(lec);
     setSessionStarted(false);
     setElapsed(0);
     elapsedRef.current = 0;
-    setFocusLevel(85);
-    setFocusStatus(1);
     setTabWarning(false);
     setDepartureCount(0);
     setYtCurrentTime(0);
@@ -265,10 +273,6 @@ const StudentDashboard = () => {
     const leaveTime = new Date();
     setTabWarning(true);
     setDepartureCount(prev => prev + 1);
-    setFocusStatus(4);
-    setFocusLevel(45);
-    focusStatusRef.current = 4;
-    focusLevelRef.current = 45;
     setTimeout(async () => {
       const returnTime = new Date();
       const duration = returnTime - leaveTime;
@@ -286,10 +290,6 @@ const StudentDashboard = () => {
         } catch (_) {}
       }
       setTabWarning(false);
-      setFocusStatus(2);
-      setFocusLevel(80);
-      focusStatusRef.current = 2;
-      focusLevelRef.current = 80;
     }, 4000);
   };
 
@@ -372,17 +372,30 @@ const StudentDashboard = () => {
         <div className="sidebar-section">
           <div className="webcam-box glass">
             <div className="cam-placeholder">
-              <span className="cam-icon">👤</span>
-              <div className="bounding-box" style={{ borderColor: sessionStarted ? status.color : '#64748b' }}></div>
-              <div className="landmarks">
-                <span className="dot" style={{ top: '40%', left: '30%', background: sessionStarted ? status.color : '#64748b' }}></span>
-                <span className="dot" style={{ top: '40%', left: '70%', background: sessionStarted ? status.color : '#64748b' }}></span>
-                <span className="dot" style={{ top: '65%', left: '50%', background: sessionStarted ? status.color : '#64748b' }}></span>
-              </div>
+              {webcam.isActive ? (
+                <video
+                  ref={webcam.videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit', transform: 'scaleX(-1)' }}
+                />
+              ) : (
+                <span className="cam-icon">👤</span>
+              )}
+              {sessionStarted && analysis.faceDetected && (
+                <div className="bounding-box" style={{ borderColor: status.color }}></div>
+              )}
+              {!analysis.faceDetected && sessionStarted && webcam.isActive && (
+                <div className="no-face-warning">화면을 바라봐주세요</div>
+              )}
             </div>
             <div className="cam-status">
-              <span className="live-dot" style={{ background: sessionStarted ? (tabWarning ? '#ef4444' : '#22c55e') : '#64748b' }}></span>
-              {sessionStarted ? (tabWarning ? '집중도 하락 기록 중' : 'On-Device AI 분석 중') : '대기 중'}
+              <span className="live-dot" style={{ background: sessionStarted ? (tabWarning ? '#ef4444' : analysis.faceDetected ? '#22c55e' : '#f59e0b') : '#64748b' }}></span>
+              {webcam.error ? webcam.error
+                : analysis.modelLoadingProgress ? analysis.modelLoadingProgress
+                : sessionStarted ? (tabWarning ? '집중도 하락 기록 중' : analysis.isAnalyzing ? `On-Device AI 분석 중 (${Math.round(analysis.confidence * 100)}%)` : '분석 준비 중...')
+                : '대기 중'}
             </div>
           </div>
 
