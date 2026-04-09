@@ -23,3 +23,6 @@ npm-debug.log*
 
 # 원본 학습 모델 파일 (용량 큼, 변환된 TF.js 모델만 git 추적)
 *.h5
+
+# Claude Code
+.claude/
