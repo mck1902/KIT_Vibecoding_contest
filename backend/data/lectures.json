@@ -1,0 +1,29 @@
+[
+  {
+    "id": "lec-001",
+    "subject": "수학",
+    "title": "[EBS] 고등예비과정 수학 I",
+    "episode": "01강. 다항식의 연산 (1)",
+    "youtubeId": "P5l2heNKK_U",
+    "analyzed": false,
+    "segments": []
+  },
+  {
+    "id": "lec-002",
+    "subject": "영어",
+    "title": "[EBS] 의진샘의 고등학교 영어 정복법",
+    "episode": "딩-기초편",
+    "youtubeId": "F229WLqJ0uo",
+    "analyzed": false,
+    "segments": []
+  },
+  {
+    "id": "lec-003",
+    "subject": "화학",
+    "title": "[EBS] 개념완성 화학1",
+    "episode": "11강. 원자의 구조",
+    "youtubeId": "DXkcmESt99Y",
+    "analyzed": false,
+    "segments": []
+  }
+]
