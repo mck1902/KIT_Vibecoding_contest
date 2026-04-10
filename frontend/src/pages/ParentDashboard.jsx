@@ -6,16 +6,6 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import './ParentDashboard.css';
 import './ParentDashboard.invite.css';
 
-const MOCK_CHART = [
-  { time: '10:00', focus: 85 },
-  { time: '10:15', focus: 78 },
-  { time: '10:30', focus: 90 },
-  { time: '10:45', focus: 60 },
-  { time: '11:00', focus: 88 },
-  { time: '11:15', focus: 95 },
-  { time: '11:30', focus: 80 },
-];
-
 function formatDuration(sec) {
   if (!sec) return '0분';
   const h = Math.floor(sec / 3600);
@@ -86,11 +76,8 @@ const ParentDashboard = () => {
     ? sessions.filter(s => s.studentId === selectedChild.studentId)
     : sessions;
 
-  const chartData = report?.chartData?.length > 0 ? report.chartData : MOCK_CHART;
-  const avgFocus = report?.avgFocus ?? 82;
-  const totalSec = report?.totalSec ?? 5400;
-  const departureCount = report?.departureCount ?? 2;
-  const tips = report?.tips ?? ['오늘 학습 세션이 순조롭게 진행되었습니다.'];
+  const chartData = report?.chartData?.length > 0 ? report.chartData : [];
+  const hasReport = !!report;
 
   // 자녀 선택 변경 시 세션 초기화
   const handleChildSelect = (child) => {
@@ -210,15 +197,17 @@ const ParentDashboard = () => {
       <section className="summary-cards">
         <div className="summary-card glass">
           <h3>총 학습시간</h3>
-          <div className="value">{formatDuration(totalSec)}</div>
+          <div className="value">{hasReport ? formatDuration(report.totalSec) : '—'}</div>
         </div>
         <div className="summary-card glass">
           <h3>평균 집중도</h3>
-          <div className="value text-primary">{avgFocus}%</div>
+          <div className="value text-primary">{hasReport ? `${report.avgFocus}%` : '—'}</div>
         </div>
         <div className="summary-card glass">
           <h3>탭 이탈 횟수</h3>
-          <div className={`value ${departureCount > 0 ? 'warning' : ''}`}>{departureCount}회</div>
+          <div className={`value ${hasReport && report.departureCount > 0 ? 'warning' : ''}`}>
+            {hasReport ? `${report.departureCount}회` : '—'}
+          </div>
         </div>
       </section>
 
@@ -226,28 +215,34 @@ const ParentDashboard = () => {
         <section className="chart-section glass">
           <h3>집중도 추이</h3>
           <div className="chart-wrapper">
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorFocus" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                <XAxis dataKey="time" stroke="var(--text-muted)" />
-                <YAxis domain={[0, 100]} stroke="var(--text-muted)" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'var(--bg-color)',
-                    borderColor: 'var(--card-border)',
-                    color: 'var(--text-main)',
-                  }}
-                  formatter={(v) => [`${v}%`, '집중도']}
-                />
-                <Area type="monotone" dataKey="focus" stroke="var(--primary)" fillOpacity={1} fill="url(#colorFocus)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorFocus" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                  <XAxis dataKey="time" stroke="var(--text-muted)" />
+                  <YAxis domain={[0, 100]} stroke="var(--text-muted)" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'var(--bg-color)',
+                      borderColor: 'var(--card-border)',
+                      color: 'var(--text-main)',
+                    }}
+                    formatter={(v) => [`${v}%`, '집중도']}
+                  />
+                  <Area type="monotone" dataKey="focus" stroke="var(--primary)" fillOpacity={1} fill="url(#colorFocus)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                {loading ? '불러오는 중...' : '세션을 선택하면 집중도 추이가 표시됩니다.'}
+              </div>
+            )}
           </div>
         </section>
 
@@ -257,9 +252,10 @@ const ParentDashboard = () => {
             <div className="card-header">
               <span className="badge">규칙 기반 AI 코칭</span>
             </div>
-            {tips.map((tip, i) => (
-              <p key={i}>{tip}</p>
-            ))}
+            {hasReport && report.tips?.length > 0
+              ? report.tips.map((tip, i) => <p key={i}>{tip}</p>)
+              : <p style={{ color: 'var(--text-muted)' }}>세션 데이터가 없습니다.</p>
+            }
           </div>
 
           {/* Claude RAG 맞춤형 분석 */}

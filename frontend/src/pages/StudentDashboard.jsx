@@ -329,26 +329,6 @@ const StudentDashboard = () => {
     sessionIdRef.current = null;
   };
 
-  const triggerMockDeparture = async () => {
-    if (!sessionStarted) return;
-    const leaveTime = new Date();
-    handleLeave('모의 이탈');
-    setTimeout(async () => {
-      const returnTime = new Date();
-      const duration = returnTime - leaveTime;
-      if (sessionIdRef.current) {
-        try {
-          await sessionAPI.addDeparture(sessionIdRef.current, {
-            leaveTime: leaveTime.toISOString(),
-            returnTime: returnTime.toISOString(),
-            duration,
-          });
-        } catch (_) {}
-      }
-      handleReturn();
-    }, 4000);
-  };
-
   const status = STATUS_MAP[focusStatus];
   const totalSec = ytDuration > 0 ? ytDuration : selectedLecture.durationSec;
   const progressPct = sessionStarted && totalSec > 0
@@ -415,9 +395,6 @@ const StudentDashboard = () => {
               <div className="filled-bar" style={{ width: `${progressPct}%` }}></div>
             </div>
             <div className="control-actions">
-              <button className="warn-btn" onClick={triggerMockDeparture} disabled={!sessionStarted}>
-                모의 탭 이탈
-              </button>
               {sessionStarted && (
                 <button className="end-btn" onClick={handleEndSession}>
                   세션 종료 · 리포트 확인 →

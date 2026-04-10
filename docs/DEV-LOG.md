@@ -4,6 +4,15 @@
 
 ---
 
+> **[이번 세션 수정 요약]**
+> - develop 브랜치 병합 (Student/Parent 분리 모델 충돌 해결)
+> - 랜딩 페이지 버튼 라우팅 연결
+> - 모의 탭 이탈 버튼 제거
+> - P1 버그 3건 수정 (학부모 중복 연결 / TF.js 인터벌 중복 / 가짜 데이터)
+> - 시드 데이터 타임스탬프 버그 수정
+
+---
+
 ## 프로젝트 현황 요약
 
 | 항목 | 상태 |
@@ -17,14 +26,113 @@
 | JWT 인증 시스템 (로그인/회원가입) | ✅ 완료 |
 | 회원 정보 수정 (초대코드/이름/비밀번호) | ✅ 완료 |
 | Student/Parent 분리 모델 + 다자녀 지원 | ✅ 완료 |
-| 초대 코드 연결 버그 수정 (3건) | ✅ 완료 |
+| 초대 코드 연결 버그 수정 (4건) | ✅ 완료 |
 | 학부모 대시보드 자녀 선택 필터 | ✅ 완료 |
-| TF.js 웹캠 연동 | ⚠️ 모델 준비됨, 코드 연동 보류 |
+| TF.js 웹캠 연동 | ✅ 완료 (인터벌 중복 버그 수정 포함) |
 | 배포 (Vercel + Render) | ❌ 미구현 |
 
 ---
 
 ## 작업 내역 (날짜순)
+
+### 2026-04-10 (7) | develop 브랜치 병합 + 버그 수정 (P1 3건 + 시드 타임스탬프)
+
+#### develop 브랜치 병합 — Student/Parent 분리 모델 충돌 해결
+
+`feat/khh` ← `develop` 머지. 충돌 파일 3개 수동 해결:
+
+| 파일 | 해결 방향 |
+|------|-----------|
+| `backend/src/controllers/authController.js` | develop의 Student/Parent 구조 채택 + HEAD의 기능(`getChild`, `getParent`, `unlink`, `updateProfile`, lazy inviteCode) 적응 |
+| `backend/src/scripts/seed.js` | develop 버전(Student/Parent 모델 기반)으로 교체 |
+| `frontend/src/pages/ParentDashboard.jsx` | HEAD 버전(`childStudentIds`, `authAPI.getChild()`, `childNames`) 유지 |
+
+`backend/src/models/User.js` — develop에서 삭제됨, HEAD에서 `git rm`으로 제거.
+
+---
+
+#### 랜딩 페이지 버튼 라우팅 연결 (`frontend/src/pages/Landing.jsx`)
+
+`useNavigate` 추가, 5개 버튼에 경로 연결:
+
+| 버튼 | 경로 |
+|------|------|
+| Login (헤더) | `/login` |
+| Sign Up (헤더) | `/register` |
+| 지금 시작하기 | `/login` |
+| 학생 모드 탐색 | `/login` |
+| 학부모 모드 탐색 | `/login` |
+
+`Register.jsx` — `useLocation`으로 `state.role` 수신, 초기 역할 자동 선택 지원 (현재 미사용, 추후 활용 가능).
+
+---
+
+#### 모의 탭 이탈 버튼 제거 (`frontend/src/pages/StudentDashboard.jsx`)
+
+- `triggerMockDeparture` 함수 삭제
+- 하단 컨트롤 바에서 "모의 탭 이탈" 버튼 제거
+
+---
+
+#### P1 버그 수정 3건
+
+**① 학부모 중복 연결 차단 (`backend/src/controllers/authController.js`)**
+
+학부모가 학생 초대 코드 입력 시, 해당 학생이 이미 다른 학부모와 연결된 경우를 차단하지 않던 문제.
+
+```js
+// 수정 전: 중복 체크 없음
+await Parent.findByIdAndUpdate(caller._id, { $addToSet: { children: partner._id } });
+
+// 수정 후
+const existingParent = await Parent.findOne({ children: partner._id });
+if (existingParent) {
+  return { linked: false, message: '해당 학생은 이미 다른 학부모와 연결되어 있습니다.' };
+}
+```
+
+학생 쪽(`BUG-03`)은 기존에 차단됨. 학부모 쪽도 동일하게 1:1 관계 강제.
+
+**② TF.js 분석 인터벌 중복 실행 방지 (`frontend/src/hooks/useAttentionAnalysis.js`)**
+
+`startAnalysis()` 호출 시 기존 `intervalRef.current`를 정리하지 않아 중복 인터벌 생성, 추론 2배 실행 + 메모리 누수 발생.
+
+```js
+// 수정: 진입 시 기존 인터벌 먼저 정리
+if (intervalRef.current) {
+  clearInterval(intervalRef.current);
+  intervalRef.current = null;
+}
+```
+
+**③ 학부모 대시보드 가짜 데이터 제거 (`frontend/src/pages/ParentDashboard.jsx`)**
+
+세션이 없을 때 `avgFocus: 82`, `totalSec: 5400`, `departureCount: 2` 같은 하드코딩 수치와 `MOCK_CHART`를 표시하던 문제.
+
+- `MOCK_CHART` 상수 삭제
+- `?? 82`, `?? 5400`, `?? 2` 폴백 제거
+- `hasReport = !!report` 플래그 기반으로 렌더링 분기
+  - 데이터 없음 시: 수치 카드 `—`, 차트 안내 문구, AI 코칭 "세션 데이터가 없습니다."
+
+---
+
+#### 시드 데이터 타임스탬프 버그 수정 (`backend/scripts/seedDemo.js`)
+
+`generateRecords()`가 `startTime`을 `'2026-04-09T14:00:00Z'`로 하드코딩. 루프에서 `sessionStart`는 2시간씩 증가하므로 2번째/3번째 세션의 records·departures 타임스탬프가 세션 시작 시각보다 2~4시간 앞서는 문제.
+
+```js
+// 수정 전
+function generateRecords(durationMin) {
+  const startTime = new Date('2026-04-09T14:00:00.000Z'); // 하드코딩
+
+// 수정 후
+function generateRecords(durationMin, startTime) {
+  // 호출부: generateRecords(lec.durationMin, sessionStart)
+```
+
+`generateDepartures(startTime)` → `generateDepartures(sessionStart)` 동일하게 수정.
+
+---
 
 ### 2026-04-10 (6) | 학부모 대시보드 UX 개선 — 자녀 선택 필터 + ProfileSettings 닫기 버튼
 

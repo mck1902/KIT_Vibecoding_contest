@@ -16,10 +16,9 @@ const Session = require('../src/models/Session');
 
 // ── 집중도 시뮬레이션 파라미터 ──────────────────────────
 // status 1~5, 3초 간격, 28분 = 560개 records
-function generateRecords(durationMin) {
+function generateRecords(durationMin, startTime) {
   const records = [];
   const totalRecords = Math.floor((durationMin * 60) / 3);
-  const startTime = new Date('2026-04-09T14:00:00.000Z');
 
   let status = 1;
 
@@ -56,7 +55,7 @@ function generateRecords(durationMin) {
     });
   }
 
-  return { records, startTime };
+  return records;
 }
 
 // ── 탭 이탈 기록 ─────────────────────────────────────
@@ -96,8 +95,8 @@ async function seed() {
     const lec = lectures[i];
     const sessionStart = new Date(baseDate.getTime() + i * 2 * 60 * 60 * 1000); // 2시간 간격
 
-    const { records, startTime } = generateRecords(lec.durationMin);
-    const departures = generateDepartures(startTime);
+    const records = generateRecords(lec.durationMin, sessionStart);
+    const departures = generateDepartures(sessionStart);
 
     const session = await Session.create({
       studentId: 'demo-student-001',

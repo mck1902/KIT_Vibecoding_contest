@@ -75,10 +75,15 @@ async function linkByCode(caller, partnerCode) {
     // 학생이 학부모 코드 입력 → 학부모의 children에 학생 추가
     await Parent.findByIdAndUpdate(partner._id, { $addToSet: { children: caller._id } });
   } else {
-    // BUG-01: 이미 연결된 자녀 중복 체크
+    // 이미 연결된 자녀 중복 체크
     const alreadyLinked = caller.children.some(c => c.equals(partner._id));
     if (alreadyLinked) {
       return { linked: false, message: '이미 연결된 자녀입니다.' };
+    }
+    // 해당 학생이 다른 학부모에 이미 연결된 경우 차단
+    const existingParent = await Parent.findOne({ children: partner._id });
+    if (existingParent) {
+      return { linked: false, message: '해당 학생은 이미 다른 학부모와 연결되어 있습니다.' };
     }
     // 학부모가 학생 코드 입력 → 내 children에 학생 추가
     await Parent.findByIdAndUpdate(caller._id, { $addToSet: { children: partner._id } });
