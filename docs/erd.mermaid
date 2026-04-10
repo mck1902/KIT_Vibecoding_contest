@@ -1,13 +1,22 @@
 erDiagram
-    User {
+    Student {
         ObjectId _id PK "자동 생성"
         String email UK "소문자 정규화"
         String passwordHash "bcrypt 10-round"
-        String role "student | parent"
-        String name "사용자 이름"
-        String studentId "학생만 - 세션 연결용"
-        String childStudentId "학부모만 - 자녀 studentId"
-        String gradeLevel "학생만 - middle | high"
+        String name "학생 이름"
+        String studentId UK "세션 연결용 고유 ID"
+        String gradeLevel "middle | high"
+        String inviteCode UK "6자리 초대 코드"
+        Date createdAt "자동"
+        Date updatedAt "자동"
+    }
+
+    Parent {
+        ObjectId _id PK "자동 생성"
+        String email UK "소문자 정규화"
+        String passwordHash "bcrypt 10-round"
+        String name "학부모 이름"
+        Array children "Student ObjectId 배열"
         String inviteCode UK "6자리 초대 코드"
         Date createdAt "자동"
         Date updatedAt "자동"
@@ -32,7 +41,7 @@ erDiagram
 
     Session {
         ObjectId _id PK "자동 생성"
-        String studentId FK "User.studentId 참조"
+        String studentId FK "Student.studentId 참조"
         String lectureId FK "Lecture.lectureId 참조"
         String subject "수학"
         Date startTime "세션 시작"
@@ -72,8 +81,8 @@ erDiagram
         String explanation "해설"
     }
 
-    User ||--o{ Session : "학생이 수강"
-    User ||--o| User : "학부모가 자녀 연결 (childStudentId)"
+    Student ||--o{ Session : "학생이 수강"
+    Parent ||--o{ Student : "자녀 관리 (children 배열)"
     Lecture ||--o{ Session : "강좌별 세션"
     Session ||--o{ Record : "집중도 기록 (내장, 3초마다)"
     Session ||--o{ Departure : "탭 이탈 기록 (내장)"

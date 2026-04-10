@@ -1,61 +1,51 @@
 require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const User = require('../models/User');
+const Student = require('../models/Student');
+const Parent = require('../models/Parent');
 
 const DEMO_STUDENT_ID = 'demo-student-001';
-
-const users = [
-  {
-    email: 'student@demo.com',
-    password: 'password123',
-    role: 'student',
-    name: '데모 학생',
-    studentId: DEMO_STUDENT_ID,
-    gradeLevel: 'high',
-    inviteCode: 'DEMO01',
-    childStudentId: null,
-  },
-  {
-    email: 'parent@demo.com',
-    password: 'password123',
-    role: 'parent',
-    name: '데모 학부모',
-    studentId: null,
-    gradeLevel: null,
-    inviteCode: 'DEMO02',
-    childStudentId: DEMO_STUDENT_ID,
-  },
-];
 
 async function seed() {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('DB 연결 완료');
 
-  for (const u of users) {
-    const existing = await User.findOne({ email: u.email });
-    if (existing) {
-      // 기존 계정에 inviteCode/gradeLevel 업데이트
-      await User.findByIdAndUpdate(existing._id, {
-        inviteCode: u.inviteCode,
-        gradeLevel: u.gradeLevel,
-        childStudentId: u.childStudentId,
-      });
-      console.log(`[UPDATE] ${u.email} → inviteCode: ${u.inviteCode}`);
-      continue;
-    }
-    const passwordHash = await bcrypt.hash(u.password, 10);
-    await User.create({
-      email: u.email,
+  // 1) 데모 학생 생성/업데이트
+  const passwordHash = await bcrypt.hash('password123', 10);
+
+  let student = await Student.findOne({ email: 'student@demo.com' });
+  if (student) {
+    await Student.findByIdAndUpdate(student._id, { inviteCode: 'DEMO01', gradeLevel: 'high' });
+    console.log('[UPDATE] student@demo.com');
+  } else {
+    student = await Student.create({
+      email: 'student@demo.com',
       passwordHash,
-      role: u.role,
-      name: u.name,
-      studentId: u.studentId,
-      childStudentId: u.childStudentId,
-      gradeLevel: u.gradeLevel,
-      inviteCode: u.inviteCode,
+      name: '데모 학생',
+      studentId: DEMO_STUDENT_ID,
+      gradeLevel: 'high',
+      inviteCode: 'DEMO01',
     });
-    console.log(`[OK] ${u.email} (${u.role}) inviteCode: ${u.inviteCode}`);
+    console.log('[OK] student@demo.com (student)');
+  }
+
+  // 2) 데모 학부모 생성/업데이트 — children에 학생 연결
+  let parent = await Parent.findOne({ email: 'parent@demo.com' });
+  if (parent) {
+    await Parent.findByIdAndUpdate(parent._id, {
+      inviteCode: 'DEMO02',
+      $addToSet: { children: student._id },
+    });
+    console.log('[UPDATE] parent@demo.com');
+  } else {
+    await Parent.create({
+      email: 'parent@demo.com',
+      passwordHash,
+      name: '데모 학부모',
+      children: [student._id],
+      inviteCode: 'DEMO02',
+    });
+    console.log('[OK] parent@demo.com (parent)');
   }
 
   console.log('\n데모 계정:');

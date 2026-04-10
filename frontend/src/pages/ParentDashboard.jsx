@@ -39,9 +39,11 @@ const ParentDashboard = () => {
   const [ragError, setRagError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 자녀 세션 목록 불러오기 (childStudentId 변경 시 재조회)
+  const hasChildren = user?.children && user.children.length > 0;
+
+  // 자녀 세션 목록 불러오기 (children 변경 시 재조회)
   useEffect(() => {
-    if (!user?.childStudentId) { setSessions([]); return; }
+    if (!hasChildren) { setSessions([]); return; }
     sessionAPI.getAll()
       .then(data => {
         if (Array.isArray(data)) {
@@ -50,7 +52,7 @@ const ParentDashboard = () => {
         }
       })
       .catch(() => {});
-  }, [user?.childStudentId]);
+  }, [hasChildren]);
 
   // 세션 리포트 불러오기
   useEffect(() => {
@@ -128,7 +130,7 @@ const ParentDashboard = () => {
         )}
 
         {/* 자녀 미연결 시 연결 폼 */}
-        {!user?.childStudentId && (
+        {!hasChildren && (
           <form className="link-form" onSubmit={handleLink}>
             <span className="link-form-label">자녀 초대 코드</span>
             <input
@@ -159,7 +161,7 @@ const ParentDashboard = () => {
             ))}
           </select>
         )}
-        {user?.childStudentId && sessions.length === 0 && !loading && (
+        {hasChildren && sessions.length === 0 && !loading && (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
             자녀의 세션이 없습니다. 학생 계정으로 세션을 시작해보세요.
           </p>
