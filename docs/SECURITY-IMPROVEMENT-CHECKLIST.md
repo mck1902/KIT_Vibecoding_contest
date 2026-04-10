@@ -35,7 +35,26 @@
   - `methods`: GET, POST, PUT, PATCH, DELETE 명시
   - `allowedHeaders`: Content-Type, Authorization 명시
 
-### 4. JWT의 localStorage 저장
+### 4. 부모 권한 토큰 잔류 (stale token) ✅ 해결됨
+
+- 대상:
+  - `backend/src/controllers/sessionController.js`
+- 문제:
+  - 부모 JWT에 `childStudentIds`가 발급 시점에 고정된다.
+  - 학생이 연결을 해제(`DELETE /api/auth/link`)해도 부모 토큰은 무효화되지 않아, 기존 토큰(최대 7일)으로 이전 자녀 세션을 계속 열람할 수 있었다.
+- 영향 범위:
+  - `GET /api/sessions` — 부모 세션 목록 조회
+  - `GET /api/sessions/:id/report` — 세션 리포트 조회
+  - `GET /api/sessions/:id/rag-analysis` — RAG 분석 조회
+  - `GET /api/sessions/:id` — 세션 상세 조회
+- 조치:
+  - **설계 수정**: `buildUserPayload`에서 `childStudentIds` 제거 — JWT payload에 변하는 권한 정보를 넣지 않음 (`authController.js`)
+  - **근본 수정 (토큰 갱신)**: `/api/auth/me`가 DB 기준 최신 payload로 새 토큰을 발급해 반환 (`authController.js`)
+  - **프론트 수정**: `AuthContext.jsx` — 앱 시작 시 `/me` 응답의 새 토큰을 localStorage에 저장. `ParentDashboard.jsx`, `ProfileSettings.jsx` — `childStudentIds` 참조를 `children`(ObjectId 배열)으로 교체
+  - **방어 심층화 (Defense in depth)**: `sessionController.js`에 `fetchParentChildIds` 헬퍼 추가 — 부모 역할은 DB를 직접 조회해 접근 검증
+  - 상세 내용: `docs/SECURITY-JWT-CHILDSTUDENTIDS.md` 참고
+
+### 5. JWT의 localStorage 저장
 
 - 대상:
   - `frontend/src/contexts/AuthContext.jsx`
@@ -76,10 +95,11 @@
 2. `.env` 추적 제외 및 샘플 파일 분리
 3. 인증 API 레이트 리밋 추가
 4. CORS 제한
-5. 보안 헤더 추가
-6. 입력 검증 강화
-7. 토큰 저장 방식 재검토
-8. 의존성 점검
+5. 부모 권한 토큰 잔류 차단
+6. 보안 헤더 추가
+7. 입력 검증 강화
+8. 토큰 저장 방식 재검토
+9. 의존성 점검
 
 ## 즉시 실행 체크리스트
 
@@ -89,6 +109,7 @@
 - [ ] `backend/.env.example` 작성
 - [x] `express-rate-limit` 추가 — 로그인(20회/15분), 회원가입(10회/1시간), 기타 인증 액션(30회/15분)
 - [x] `cors()`를 허용 origin 기반 설정으로 교체 — methods, allowedHeaders 명시 포함
+- [x] 부모 권한 토큰 잔류 차단 — `fetchParentChildIds` DB 실시간 조회로 교체 (`sessionController.js`)
 - [ ] `helmet` 추가
 - [x] 인증/세션 API 요청 스키마 검증 추가 — `zod` + `validate` 미들웨어 적용
 - [ ] 프론트/백엔드 의존성 취약점 점검

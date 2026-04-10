@@ -31,9 +31,9 @@ const ParentDashboard = () => {
   const [ragError, setRagError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 자녀 정보 + 세션 목록 불러오기 (childStudentIds 변경 시 재조회)
+  // 자녀 정보 + 세션 목록 불러오기 (children 변경 시 재조회)
   useEffect(() => {
-    if (!user?.childStudentIds?.length) { setSessions([]); setChildren([]); return; }
+    if (!user?.children?.length) { setSessions([]); setChildren([]); return; }
     authAPI.getChild()
       .then(data => { if (data.children?.length) setChildren(data.children); })
       .catch(() => {});
@@ -45,7 +45,7 @@ const ParentDashboard = () => {
         }
       })
       .catch(() => {});
-  }, [user?.childStudentIds?.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.children?.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 세션 리포트 불러오기
   useEffect(() => {
@@ -136,7 +136,7 @@ const ParentDashboard = () => {
         )}
 
         {/* 자녀 미연결 시 연결 폼 */}
-        {(!user?.childStudentIds?.length || true) && (
+        {(!user?.children?.length || true) && (
           <form className="link-form" onSubmit={handleLink}>
             <span className="link-form-label">자녀 초대 코드</span>
             <input
@@ -187,7 +187,7 @@ const ParentDashboard = () => {
             ))}
           </select>
         )}
-        {user?.childStudentIds?.length > 0 && filteredSessions.length === 0 && !loading && (
+        {user?.children?.length > 0 && filteredSessions.length === 0 && !loading && (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
             {selectedChild ? `${selectedChild.name}의 세션이 없습니다.` : '자녀의 세션이 없습니다. 학생 계정으로 세션을 시작해보세요.'}
           </p>

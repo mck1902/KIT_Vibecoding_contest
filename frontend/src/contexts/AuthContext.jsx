@@ -22,8 +22,11 @@ export function AuthProvider({ children }) {
         return res.json();
       })
       .then((data) => {
-        setToken(stored);
+        // /me가 반환한 새 토큰으로 교체 (stale token 방지)
+        const freshToken = data.token || stored;
+        setToken(freshToken);
         setUser(data.user);
+        localStorage.setItem('eduwatch_token', freshToken);
         localStorage.setItem('eduwatch_user', JSON.stringify(data.user));
       })
       .catch(() => {

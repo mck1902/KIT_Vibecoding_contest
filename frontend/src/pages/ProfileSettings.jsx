@@ -40,7 +40,7 @@ const ProfileSettings = () => {
   const [pwStatus, setPwStatus] = useState('idle'); // idle | loading | success | error
   const [pwMessage, setPwMessage] = useState('');
 
-  const isLinked = !!(user?.childStudentIds?.length);
+  const isLinked = !!(user?.children?.length);
 
   // 학부모인 경우 자녀 목록 조회
   useEffect(() => {
@@ -48,7 +48,7 @@ const ProfileSettings = () => {
     authAPI.getChild()
       .then(data => { if (data.children) setChildren(data.children); })
       .catch(() => { });
-  }, [user?.role, user?.childStudentIds?.join(',')]);
+  }, [user?.role, user?.children?.join(',')]);
 
   // 학생인 경우 연결된 학부모 정보 조회
   useEffect(() => {

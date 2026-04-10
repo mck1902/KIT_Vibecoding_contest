@@ -1,13 +1,25 @@
 const mongoose = require('mongoose');
 const Session = require('../models/Session');
 const Lecture = require('../models/Lecture');
+const Parent = require('../models/Parent');
 const { generateRuleBasedTips, buildChartData } = require('../utils/reportGenerator');
 const { generateRagReport } = require('../utils/claudeService');
 const STATUS_TO_FOCUS = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
 
-function hasSessionAccess(user, session) {
+// JWT의 childStudentIds를 신뢰하지 않고 DB에서 현재 상태를 조회
+// 학생이 연결 해제 후에도 기존 토큰으로 세션에 접근하는 권한 잔류 문제를 방지
+async function fetchParentChildIds(parentId) {
+  const parent = await Parent.findById(parentId).populate('children', 'studentId');
+  if (!parent) return [];
+  return parent.children.map(c => c.studentId);
+}
+
+async function hasSessionAccess(user, session) {
   if (user.role === 'student') return user.studentId === session.studentId;
-  if (user.role === 'parent') return Array.isArray(user.childStudentIds) && user.childStudentIds.includes(session.studentId);
+  if (user.role === 'parent') {
+    const childStudentIds = await fetchParentChildIds(user.id);
+    return childStudentIds.includes(session.studentId);
+  }
   return false;
 }
 
@@ -111,7 +123,7 @@ async function getSessionReport(req, res) {
     }
     const session = await Session.findById(id);
     if (!session) return res.status(404).json({ message: 'Session not found.' });
-    if (!hasSessionAccess(req.user, session)) {
+    if (!await hasSessionAccess(req.user, session)) {
       return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
     }
 
@@ -154,7 +166,7 @@ async function getRagAnalysis(req, res) {
     }
     const session = await Session.findById(id);
     if (!session) return res.status(404).json({ message: 'Session not found.' });
-    if (!hasSessionAccess(req.user, session)) {
+    if (!await hasSessionAccess(req.user, session)) {
       return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
     }
 
@@ -205,10 +217,11 @@ async function getSessions(req, res) {
     if (req.user.role === 'student') {
       filter.studentId = req.user.studentId;
     } else if (req.user.role === 'parent') {
-      if (!req.user.childStudentIds?.length) {
+      const childStudentIds = await fetchParentChildIds(req.user.id);
+      if (!childStudentIds.length) {
         return res.status(200).json([]);
       }
-      filter.studentId = { $in: req.user.childStudentIds };
+      filter.studentId = { $in: childStudentIds };
     }
 
     if (lectureId) filter.lectureId = lectureId;
@@ -229,7 +242,7 @@ async function getSessionById(req, res) {
     }
     const session = await Session.findById(id);
     if (!session) return res.status(404).json({ message: 'Session not found.' });
-    if (!hasSessionAccess(req.user, session)) {
+    if (!await hasSessionAccess(req.user, session)) {
       return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
     }
     return res.status(200).json(session);

@@ -40,10 +40,10 @@ async function buildUserPayload(user) {
     base.studentId = user.studentId;
     base.gradeLevel = user.gradeLevel;
   } else {
-    // children populate → childStudentIds(string[]) 추출 (sessionController 호환)
+    // children(ObjectId[])만 포함 — childStudentIds는 JWT에 넣지 않음
+    // 세션 접근 권한은 sessionController에서 DB를 직접 조회해 검증
     const populated = await Parent.findById(user._id).populate('children', 'studentId');
     base.children = (populated?.children || []).map(c => c._id);
-    base.childStudentIds = (populated?.children || []).map(c => c.studentId);
   }
   return base;
 }
@@ -173,6 +173,8 @@ async function login(req, res) {
 }
 
 // GET /api/auth/me
+// DB 최신 상태 기반으로 새 토큰을 발급해 반환
+// 앱 시작 시 stale token 문제를 해소하고, 연결 해제 등 권한 변경이 즉시 반영되도록 함
 async function me(req, res) {
   try {
     const Model = req.user.role === 'student' ? Student : Parent;
@@ -186,7 +188,8 @@ async function me(req, res) {
     }
 
     const payload = await buildUserPayload(user);
-    return res.status(200).json({ user: payload });
+    const token = signToken(payload);
+    return res.status(200).json({ user: payload, token });
   } catch (error) {
     console.error('[me]', error);
     return res.status(500).json({ message: '사용자 정보를 불러오지 못했습니다.' });
