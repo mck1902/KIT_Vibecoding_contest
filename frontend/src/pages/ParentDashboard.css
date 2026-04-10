@@ -169,3 +169,8 @@
 .session-select:focus {
   border-color: var(--primary);
 }
+
+.session-select option {
+  background: var(--input-bg);
+  color: var(--text-main);
+}

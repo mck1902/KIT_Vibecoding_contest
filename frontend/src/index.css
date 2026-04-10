@@ -20,6 +20,7 @@
   --header-bg: rgba(248, 250, 252, 0.8);
   --btn-text: #ffffff;
   --accent-color: #8b5cf6;
+  --input-bg: #ffffff;
 }
 
 [data-theme='dark'] {
@@ -34,6 +35,7 @@
   --header-bg: rgba(11, 15, 25, 0.8);
   --btn-text: #ffffff;
   --accent-color: #a78bfa;
+  --input-bg: #1e2535;
 }
 
 * {
