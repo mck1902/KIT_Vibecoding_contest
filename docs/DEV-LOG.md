@@ -23,6 +23,41 @@
 
 ## 작업 내역 (날짜순)
 
+### 2026-04-10 (4) | 보안 강화 — CORS 제한 / 레이트 리밋 / 입력값 검증
+
+#### CORS 설정 강화 (`backend/src/index.js`)
+
+- `app.use(cors())` 전면 허용 → origin/methods/allowedHeaders 명시적 제한
+- `ALLOWED_ORIGINS` 환경변수로 개발/운영 분리 (기본값: `http://localhost:5173`)
+- `methods`: GET, POST, PUT, PATCH, DELETE
+- `allowedHeaders`: Content-Type, Authorization
+
+#### 레이트 리밋 (`express-rate-limit`, `backend/src/routes/auth.js`)
+
+| 엔드포인트 | 제한 |
+|-----------|------|
+| `POST /api/auth/login` | IP당 15분에 20회 |
+| `POST /api/auth/register` | IP당 1시간에 10회 |
+| `PUT /api/auth/link`, `PATCH /api/auth/profile` | IP당 15분에 30회 |
+
+초과 시 `429 Too Many Requests` + 한국어 메시지 반환.
+
+#### 입력값 검증 (`zod`, `backend/src/middleware/validate.js`)
+
+`validate(schema)` 미들웨어 팩토리 생성. 검증 실패 시 컨트롤러 진입 전 `400` 차단.
+
+| 엔드포인트 | 검증 항목 |
+|-----------|---------|
+| `POST /register` | email 형식, password 6자+, role enum, student → gradeLevel 필수 |
+| `POST /login` | email 형식, password 존재 |
+| `PUT /link` | partnerCode 존재 |
+| `PATCH /profile` | 변경 항목 존재, 비밀번호 변경 시 currentPassword 필수 |
+| `POST /sessions` | lectureId 필수 |
+| `POST /sessions/:id/records` | timestamp ISO 형식, status 1~5, confidence 0~1 |
+| `POST /sessions/:id/departures` | leaveTime/returnTime ISO 형식, duration 0+ |
+
+---
+
 ### 2026-04-10 (3) | 다자녀 지원 스키마 마이그레이션
 
 #### User 모델 변경 (`backend/src/models/User.js`)
@@ -31,22 +66,46 @@
 |---------|---------|------|
 | `childStudentId: String` | `childStudentIds: [String]` | 학부모 1명이 여러 자녀를 모니터링 |
 
-#### authController 전체 반영
+#### authController 전체 반영 (`backend/src/controllers/authController.js`)
 
 - `generateToken`, `userPayload` — `childStudentIds` 배열로 교체
 - `linkByCode` — `$push: { childStudentIds }` (중복 방지 포함)
 - `link` — 학생/학부모 모두 `$push` + 중복 시 409 반환
-- `getChild` — 단일 객체 → `children` 배열 반환 (`User.find({ studentId: { $in: [...] } })`)
+- `getChild` — 단일 객체 → `{ children: [...] }` 배열 반환 (`User.find({ studentId: { $in: [...] } })`)
 - `getParent` — `childStudentIds: student.studentId` 조건으로 학부모 조회
 - `unlink`
   - 학생: `User.updateMany({ childStudentIds: studentId }, $pull)` — 연결된 모든 학부모에서 제거
-  - 학부모: `?studentId=` 쿼리 파라미터로 특정 자녀만 제거, 없으면 전체 해제 (`$set: []`)
+  - 학부모: `?studentId=` 쿼리 파라미터로 특정 자녀만 제거, 없으면 전체 해제
+
+#### sessionController 반영 (`backend/src/controllers/sessionController.js`)
+
+- `hasSessionAccess` — 부모 역할 시 `childStudentIds.includes(session.studentId)` 배열 체크로 변경
+- `getSessions` — 부모 필터: `{ studentId: { $in: childStudentIds } }` (전체 자녀 세션 조회)
 
 #### 시드 스크립트 업데이트 (`backend/src/scripts/seed.js`)
-- 데모 학부모 계정: `childStudentIds: [DEMO_STUDENT_ID]` 배열로 변경
-- 기존 계정 업데이트 시 `childStudentIds` 갱신
 
-> **⚠️ 프론트엔드 영향**: `user.childStudentId` → `user.childStudentIds` (배열), `getChild()` 응답 `child` → `children` 배열로 변경됨. 관련 UI 코드 업데이트 필요.
+- 데모 학부모 계정: `childStudentIds: [DEMO_STUDENT_ID]` 배열로 변경
+
+#### 프론트엔드 반영
+
+**`frontend/src/services/api.js`**
+- `getChild()` 응답 형식: `{ child }` → `{ children: [] }`
+- `unlink(studentId?)` — 학부모가 특정 자녀만 해제 시 `?studentId=` 쿼리 파라미터 전달
+
+**`frontend/src/pages/ParentDashboard.jsx`**
+- `childName` → `childNames[]` 배열, `getChild()` 응답의 `children` 매핑
+- 헤더 subtitle: 여러 자녀 이름 쉼표로 나열 (`"김학생, 이학생의 학습 리포트"`)
+- 자녀 연결 폼: 항상 표시 (다자녀 추가 허용)
+- `user?.childStudentId` → `user?.childStudentIds?.length` 조건 전환
+
+**`frontend/src/pages/ProfileSettings.jsx`**
+- `childInfo` → `children[]` 배열
+- "연결된 자녀" 섹션: 자녀 목록 렌더링 + 각 자녀별 개별 "연결 해제" 버튼
+- `handleUnlink(studentId?)` — 특정 자녀 studentId 전달로 개별 해제
+- `isLinked`: `user?.childStudentIds?.length > 0` 조건으로 변경
+- 학부모 연결 현황 문구: "자녀 N명과 연결되어 있습니다. 추가 연결도 가능합니다."
+
+> **⚠️ DB 마이그레이션 필요**: 기존 MongoDB에 `childStudentId` 필드로 저장된 데이터는 `childStudentIds` 배열로 수동 이전 또는 `npm run seed` 재실행 필요.
 
 ---
 

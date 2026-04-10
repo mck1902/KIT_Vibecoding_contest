@@ -28,16 +28,12 @@
   - 회원가입: IP당 1시간에 10회
   - 연결/프로필 변경: IP당 15분에 30회
 
-### 3. CORS 전면 허용
+### 3. CORS 전면 허용 ✅ 해결됨
 
-- 대상: `backend/src/index.js`
-- 문제:
-  - `app.use(cors())`만 적용되어 origin 제한이 없다.
-- 위험:
-  - 운영 환경에서 허용하지 않은 출처도 API 호출 가능
-- 조치:
-  - 개발/운영 origin을 분리해 명시적으로 허용
-  - 허용 메서드와 헤더도 제한
+- `backend/src/index.js` 수정 완료
+  - `ALLOWED_ORIGINS` 환경변수 기반 origin 제한 (기본값: `http://localhost:5173`)
+  - `methods`: GET, POST, PUT, PATCH, DELETE 명시
+  - `allowedHeaders`: Content-Type, Authorization 명시
 
 ### 4. JWT의 localStorage 저장
 
@@ -92,7 +88,7 @@
 - [ ] `.gitignore`에 `.env`, `backend/.env` 포함 여부 확인
 - [ ] `backend/.env.example` 작성
 - [x] `express-rate-limit` 추가 — 로그인(20회/15분), 회원가입(10회/1시간), 기타 인증 액션(30회/15분)
-- [ ] `cors()`를 허용 origin 기반 설정으로 교체
+- [x] `cors()`를 허용 origin 기반 설정으로 교체 — methods, allowedHeaders 명시 포함
 - [ ] `helmet` 추가
 - [x] 인증/세션 API 요청 스키마 검증 추가 — `zod` + `validate` 미들웨어 적용
 - [ ] 프론트/백엔드 의존성 취약점 점검

@@ -54,7 +54,7 @@ const ParentDashboard = () => {
         }
       })
       .catch(() => {});
-  }, [user?.childStudentIds?.join(',')]);
+  }, [user?.childStudentIds?.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 세션 리포트 불러오기
   useEffect(() => {

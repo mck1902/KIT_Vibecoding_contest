@@ -38,15 +38,15 @@ const ProfileSettings = () => {
   const [pwStatus, setPwStatus] = useState('idle'); // idle | loading | success | error
   const [pwMessage, setPwMessage] = useState('');
 
-  const isLinked = !!(user?.childStudentId);
+  const isLinked = !!(user?.childStudentIds?.length);
 
-  // 학부모인 경우 자녀 정보 조회
+  // 학부모인 경우 자녀 목록 조회
   useEffect(() => {
-    if (user?.role !== 'parent' || !user?.childStudentId) return;
+    if (user?.role !== 'parent') return;
     authAPI.getChild()
-      .then(data => { if (data.child) setChildInfo(data.child); })
+      .then(data => { if (data.children) setChildren(data.children); })
       .catch(() => { });
-  }, [user?.role, user?.childStudentId]);
+  }, [user?.role, user?.childStudentIds?.join(',')]);
 
   // 학생인 경우 연결된 학부모 정보 조회
   useEffect(() => {
@@ -66,13 +66,13 @@ const ProfileSettings = () => {
     });
   };
 
-  const handleUnlink = async () => {
+  const handleUnlink = async (studentId = null) => {
     setUnlinkStatus('loading');
     try {
-      const data = await authAPI.unlink();
+      const data = await authAPI.unlink(studentId);
       if (data.token) updateUser(data.user, data.token);
       setParentInfo(null);
-      setChildInfo(null);
+      setChildren(prev => studentId ? prev.filter(c => c.studentId !== studentId) : []);
       setUnlinkConfirm(false);
       setUnlinkStatus('done');
     } catch {
@@ -92,9 +92,9 @@ const ProfileSettings = () => {
       setLinkStatus('success');
       setLinkMessage('연결되었습니다!');
       setPartnerCode('');
-      // 자녀 정보 새로고침
+      // 자녀 목록 새로고침
       if (newUser.role === 'parent') {
-        authAPI.getChild().then(data => { if (data.child) setChildInfo(data.child); }).catch(() => { });
+        authAPI.getChild().then(data => { if (data.children) setChildren(data.children); }).catch(() => { });
       }
     } catch (err) {
       setLinkStatus('error');
@@ -176,26 +176,34 @@ const ProfileSettings = () => {
         </div>
       </section>
 
-      {/* 연결된 자녀 정보 (학부모 전용) */}
+      {/* 연결된 자녀 목록 (학부모 전용) */}
       {user?.role === 'parent' && (
         <section className="settings-card glass">
-          <h3 className="settings-section-title">연결된 자녀</h3>
-          {childInfo ? (
-            <div className="child-info">
+          <h3 className="settings-section-title">연결된 자녀 ({children.length}명)</h3>
+          {children.length > 0 ? children.map(child => (
+            <div key={child.studentId} className="child-info" style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--card-border)' }}>
               <div className="info-row">
                 <span className="info-label">이름</span>
-                <span className="info-value">{childInfo.name}</span>
+                <span className="info-value">{child.name}</span>
               </div>
               <div className="info-row">
                 <span className="info-label">학교급</span>
-                <span className="info-value">{GRADE_LABEL[childInfo.gradeLevel] ?? '—'}</span>
+                <span className="info-value">{GRADE_LABEL[child.gradeLevel] ?? '—'}</span>
               </div>
               <div className="info-row">
                 <span className="info-label">학생 ID</span>
-                <span className="info-value info-value-mono">{childInfo.studentId}</span>
+                <span className="info-value info-value-mono">{child.studentId}</span>
               </div>
+              <button
+                className="btn-unlink"
+                style={{ marginTop: '0.5rem' }}
+                onClick={() => handleUnlink(child.studentId)}
+                disabled={unlinkStatus === 'loading'}
+              >
+                연결 해제
+              </button>
             </div>
-          ) : (
+          )) : (
             <p className="settings-desc">연결된 자녀가 없습니다. 아래에서 자녀 초대 코드를 입력해주세요.</p>
           )}
         </section>
@@ -267,11 +275,11 @@ const ProfileSettings = () => {
           </div>
         )}
 
-        {/* 학부모: 자녀 연결됨 표시 */}
+        {/* 학부모: 자녀 연결 현황 */}
         {user?.role === 'parent' && isLinked && (
           <div className="linked-status">
             <span className="linked-dot"></span>
-            <span>자녀와 연결되어 있습니다.</span>
+            <span>자녀 {children.length}명과 연결되어 있습니다. 추가 연결도 가능합니다.</span>
           </div>
         )}
 
