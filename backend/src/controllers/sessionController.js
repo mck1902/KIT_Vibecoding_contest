@@ -1,11 +1,8 @@
-const fs = require('fs');
-const path = require('path');
 const mongoose = require('mongoose');
 const Session = require('../models/Session');
+const Lecture = require('../models/Lecture');
 const { generateRuleBasedTips, buildChartData } = require('../utils/reportGenerator');
 const { generateRagReport } = require('../utils/claudeService');
-
-const LECTURES_PATH = path.join(__dirname, '../../data/lectures.json');
 const STATUS_TO_FOCUS = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
 
 function hasSessionAccess(user, session) {
@@ -156,8 +153,7 @@ async function getRagAnalysis(req, res) {
       return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
     }
 
-    const lectures = JSON.parse(fs.readFileSync(LECTURES_PATH, 'utf-8'));
-    const lecture = lectures.find(l => l.id === session.lectureId);
+    const lecture = await Lecture.findOne({ lectureId: session.lectureId });
 
     if (!lecture) {
       return res.status(404).json({ message: 'Lecture not found.' });
