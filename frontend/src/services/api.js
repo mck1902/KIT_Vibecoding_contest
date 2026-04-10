@@ -3,7 +3,9 @@
  * vite.config.js의 proxy 설정으로 /api → http://localhost:5000/api 포워딩됨
  */
 
-const BASE_URL = '/api';
+const BASE_URL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
 
 function getToken() {
   return localStorage.getItem('eduwatch_token');
