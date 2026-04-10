@@ -74,3 +74,31 @@
   background: var(--primary-hover);
   transform: translateY(-1px);
 }
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.nav-username {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.btn-logout {
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 50%;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-logout:hover {
+  background: var(--card-border);
+  color: #ef4444;
+}

@@ -5,15 +5,25 @@
 
 const BASE_URL = '/api';
 
+function getToken() {
+  return localStorage.getItem('eduwatch_token');
+}
+
 async function request(method, path, body) {
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-  };
+  const headers = { 'Content-Type': 'application/json' };
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const opts = { method, headers };
   if (body !== undefined) opts.body = JSON.stringify(body);
 
   const res = await fetch(`${BASE_URL}${path}`, opts);
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('eduwatch_token');
+      localStorage.removeItem('eduwatch_user');
+      window.location.href = '/login';
+    }
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || `HTTP ${res.status}`);
   }
@@ -21,12 +31,21 @@ async function request(method, path, body) {
 }
 
 // ──────────────────────────────────────────────
+// 인증 API
+// ──────────────────────────────────────────────
+export const authAPI = {
+  /** 초대 코드로 상대방 연결 → { token, user } */
+  link: (partnerCode) =>
+    request('PUT', '/auth/link', { partnerCode }),
+};
+
+// ──────────────────────────────────────────────
 // 세션 API
 // ──────────────────────────────────────────────
 export const sessionAPI = {
   /** 새 학습 세션 시작 → { _id, studentId, lectureId, subject, startTime } */
-  start: (studentId, lectureId, subject) =>
-    request('POST', '/sessions', { studentId, lectureId, subject }),
+  start: (lectureId, subject) =>
+    request('POST', '/sessions', { lectureId, subject }),
 
   /** 세션 종료 */
   end: (sessionId) =>
@@ -52,9 +71,9 @@ export const sessionAPI = {
   getById: (sessionId) =>
     request('GET', `/sessions/${sessionId}`),
 
-  /** 학생의 세션 목록 조회 */
-  getByStudent: (studentId) =>
-    request('GET', `/sessions?studentId=${studentId}`),
+  /** 로그인 사용자의 세션 목록 조회 (역할별 자동 필터) */
+  getAll: () =>
+    request('GET', '/sessions'),
 };
 
 // ──────────────────────────────────────────────

@@ -460,3 +460,50 @@
     flex-direction: column;
   }
 }
+.invite-code-card {
+  padding: 1rem;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.invite-code-title {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+  font-weight: 500;
+}
+
+.invite-code-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.invite-code-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--primary);
+  font-family: monospace;
+}
+
+.invite-copy-btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.invite-copy-btn:hover { opacity: 0.8; }
+
+.invite-code-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}

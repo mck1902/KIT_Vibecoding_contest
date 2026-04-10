@@ -8,6 +8,17 @@ const { generateRagReport } = require('../utils/claudeService');
 const LECTURES_PATH = path.join(__dirname, '../../data/lectures.json');
 const STATUS_TO_FOCUS = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
 
+function resolveStudentId(user) {
+  if (user.role === 'student') return user.studentId;
+  if (user.role === 'parent') return user.childStudentId;
+  return null;
+}
+
+function hasSessionAccess(user, session) {
+  const allowedId = resolveStudentId(user);
+  return allowedId && session.studentId === allowedId;
+}
+
 function calcAvgFocus(records) {
   if (!records || records.length === 0) return 0;
   return Math.round(
@@ -18,7 +29,8 @@ function calcAvgFocus(records) {
 // POST /api/sessions — 세션 시작
 async function createSession(req, res) {
   try {
-    const { studentId, lectureId, subject } = req.body;
+    const { lectureId, subject } = req.body;
+    const studentId = req.user.studentId;
     if (!studentId || !lectureId) {
       return res.status(400).json({ message: 'studentId and lectureId are required.' });
     }
@@ -41,9 +53,13 @@ async function endSession(req, res) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid session ID.' });
     }
-    const session = await Session.findByIdAndUpdate(id, { endTime: new Date() }, { new: true });
+    const session = await Session.findById(id);
     if (!session) return res.status(404).json({ message: 'Session not found.' });
-    return res.status(200).json(session);
+    if (session.studentId !== req.user.studentId) {
+      return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
+    }
+    await session.updateOne({ endTime: new Date() });
+    return res.status(200).json({ ...session.toObject(), endTime: new Date() });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to end session.', error: error.message });
   }
@@ -57,8 +73,13 @@ async function addRecords(req, res) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid session ID.' });
     }
+    const session = await Session.findById(id);
+    if (!session) return res.status(404).json({ message: 'Session not found.' });
+    if (session.studentId !== req.user.studentId) {
+      return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
+    }
     const items = Array.isArray(records) ? records : [records];
-    await Session.findByIdAndUpdate(id, { $push: { records: { $each: items } } });
+    await session.updateOne({ $push: { records: { $each: items } } });
     return res.status(200).json({ ok: true });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to add records.', error: error.message });
@@ -73,9 +94,12 @@ async function addDeparture(req, res) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid session ID.' });
     }
-    await Session.findByIdAndUpdate(id, {
-      $push: { departures: { leaveTime, returnTime, duration } },
-    });
+    const session = await Session.findById(id);
+    if (!session) return res.status(404).json({ message: 'Session not found.' });
+    if (session.studentId !== req.user.studentId) {
+      return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
+    }
+    await session.updateOne({ $push: { departures: { leaveTime, returnTime, duration } } });
     return res.status(200).json({ ok: true });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to add departure.', error: error.message });
@@ -91,6 +115,9 @@ async function getSessionReport(req, res) {
     }
     const session = await Session.findById(id);
     if (!session) return res.status(404).json({ message: 'Session not found.' });
+    if (!hasSessionAccess(req.user, session)) {
+      return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
+    }
 
     const avgFocus = calcAvgFocus(session.records);
     const tips = generateRuleBasedTips({
@@ -130,6 +157,9 @@ async function getRagAnalysis(req, res) {
     }
     const session = await Session.findById(id);
     if (!session) return res.status(404).json({ message: 'Session not found.' });
+    if (!hasSessionAccess(req.user, session)) {
+      return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
+    }
 
     const lectures = JSON.parse(fs.readFileSync(LECTURES_PATH, 'utf-8'));
     const lecture = lectures.find(l => l.id === session.lectureId);
@@ -169,12 +199,21 @@ async function getRagAnalysis(req, res) {
   }
 }
 
-// GET /api/sessions — 세션 목록 조회
+// GET /api/sessions — 세션 목록 조회 (역할 기반)
 async function getSessions(req, res) {
   try {
-    const { studentId, lectureId } = req.query;
+    const { lectureId } = req.query;
     const filter = {};
-    if (studentId) filter.studentId = studentId;
+
+    if (req.user.role === 'student') {
+      filter.studentId = req.user.studentId;
+    } else if (req.user.role === 'parent') {
+      if (!req.user.childStudentId) {
+        return res.status(200).json([]);
+      }
+      filter.studentId = req.user.childStudentId;
+    }
+
     if (lectureId) filter.lectureId = lectureId;
     const sessions = await Session.find(filter).sort({ startTime: -1 });
     return res.status(200).json(sessions);
@@ -192,6 +231,9 @@ async function getSessionById(req, res) {
     }
     const session = await Session.findById(id);
     if (!session) return res.status(404).json({ message: 'Session not found.' });
+    if (!hasSessionAccess(req.user, session)) {
+      return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
+    }
     return res.status(200).json(session);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to fetch session.', error: error.message });

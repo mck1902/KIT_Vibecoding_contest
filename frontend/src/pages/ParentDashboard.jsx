@@ -1,8 +1,10 @@
 /* 2026-04-09: 실 세션 데이터 + Claude RAG 리포트 연동 */
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { sessionAPI, authAPI } from '../services/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './ParentDashboard.css';
+import './ParentDashboard.invite.css';
 
 const MOCK_CHART = [
   { time: '10:00', focus: 85 },
@@ -23,40 +25,56 @@ function formatDuration(sec) {
 }
 
 const ParentDashboard = () => {
-  const location = useLocation();
-  const sessionId = location.state?.sessionId || null;
+  const { user, updateUser } = useAuth();
 
+  const [sessions, setSessions] = useState([]);
+  const [selectedSessionId, setSelectedSessionId] = useState(null);
+  const [linkCode, setLinkCode] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState('');
+  const [linkSuccess, setLinkSuccess] = useState(false);
   const [report, setReport] = useState(null);
   const [ragText, setRagText] = useState('');
   const [ragLoading, setRagLoading] = useState(false);
   const [ragError, setRagError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // 자녀 세션 목록 불러오기 (childStudentId 변경 시 재조회)
+  useEffect(() => {
+    if (!user?.childStudentId) { setSessions([]); return; }
+    sessionAPI.getAll()
+      .then(data => {
+        if (Array.isArray(data)) {
+          setSessions(data);
+          if (data.length > 0) setSelectedSessionId(data[0]._id);
+        }
+      })
+      .catch(() => {});
+  }, [user?.childStudentId]);
+
   // 세션 리포트 불러오기
   useEffect(() => {
-    if (!sessionId) return;
+    if (!selectedSessionId) return;
     setLoading(true);
-    fetch(`/api/sessions/${sessionId}/report`)
-      .then(r => r.json())
+    sessionAPI.getReport(selectedSessionId)
       .then(data => setReport(data))
       .catch(() => setReport(null))
       .finally(() => setLoading(false));
-  }, [sessionId]);
+  }, [selectedSessionId]);
 
   // RAG 분석 불러오기
   useEffect(() => {
-    if (!sessionId) return;
+    if (!selectedSessionId) return;
     setRagLoading(true);
     setRagError('');
-    fetch(`/api/sessions/${sessionId}/rag-analysis`)
-      .then(r => r.json())
+    sessionAPI.getRagAnalysis(selectedSessionId)
       .then(data => {
         if (data.ragAnalysis) setRagText(data.ragAnalysis);
         else setRagError(data.message || 'RAG 분석을 불러올 수 없습니다.');
       })
       .catch(() => setRagError('서버 연결 오류로 RAG 분석을 불러올 수 없습니다.'))
       .finally(() => setRagLoading(false));
-  }, [sessionId]);
+  }, [selectedSessionId]);
 
   const chartData = report?.chartData?.length > 0 ? report.chartData : MOCK_CHART;
   const avgFocus = report?.avgFocus ?? 82;
@@ -64,14 +82,88 @@ const ParentDashboard = () => {
   const departureCount = report?.departureCount ?? 2;
   const tips = report?.tips ?? ['오늘 학습 세션이 순조롭게 진행되었습니다.'];
 
+  const handleLink = async (e) => {
+    e.preventDefault();
+    if (!linkCode.trim()) return;
+    setLinkLoading(true);
+    setLinkError('');
+    try {
+      const data = await authAPI.link(linkCode.toUpperCase());
+      updateUser(data.user, data.token);
+      setLinkSuccess(true);
+      setLinkCode('');
+    } catch (err) {
+      setLinkError(err.message);
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+
   return (
     <div className="dashboard-container container animate-fade-in">
       <header className="dashboard-header">
         <h2>학습 대시보드</h2>
         <p className="subtitle">
-          {sessionId ? '방금 완료한 세션 리포트' : '샘플 데이터 기반 대시보드'}
+          {user?.name ? `${user.name}님의 자녀 학습 리포트` : '학습 리포트'}
           {loading && <span className="loading-tag"> · 불러오는 중...</span>}
         </p>
+
+        {/* 내 초대 코드 */}
+        {user?.inviteCode && (
+          <div className="parent-invite-row">
+            <span className="parent-invite-label">내 초대 코드</span>
+            <span className="parent-invite-code">{user.inviteCode}</span>
+            <button
+              className="parent-invite-copy"
+              onClick={() => navigator.clipboard.writeText(user.inviteCode).then(() => alert('복사되었습니다.'))}
+            >복사</button>
+            <span className="parent-invite-hint">자녀에게 알려주세요</span>
+          </div>
+        )}
+
+        {/* 자녀 미연결 시 연결 폼 */}
+        {!user?.childStudentId && (
+          <form className="link-form" onSubmit={handleLink}>
+            <span className="link-form-label">자녀 초대 코드</span>
+            <input
+              className="link-form-input"
+              value={linkCode}
+              onChange={(e) => setLinkCode(e.target.value.toUpperCase())}
+              placeholder="예: ABC123"
+              maxLength={6}
+            />
+            <button className="link-form-btn" type="submit" disabled={linkLoading}>
+              {linkLoading ? '연결 중...' : '연결하기'}
+            </button>
+            {linkError && <span className="link-form-error">{linkError}</span>}
+            {linkSuccess && <span className="link-form-success">자녀가 연결되었습니다!</span>}
+          </form>
+        )}
+
+        {sessions.length > 1 && (
+          <select
+            value={selectedSessionId || ''}
+            onChange={(e) => setSelectedSessionId(e.target.value)}
+            style={{ marginTop: '0.5rem', background: 'var(--bg-color)', color: 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '8px', padding: '0.4rem 0.8rem', cursor: 'pointer' }}
+          >
+            {sessions.map(s => (
+              <option key={s._id} value={s._id}>
+                {s.subject || s.lectureId} — {formatDate(s.startTime)}
+              </option>
+            ))}
+          </select>
+        )}
+        {user?.childStudentId && sessions.length === 0 && !loading && (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+            자녀의 세션이 없습니다. 학생 계정으로 세션을 시작해보세요.
+          </p>
+        )}
       </header>
 
       <section className="summary-cards">
@@ -140,18 +232,7 @@ const ParentDashboard = () => {
             {!ragLoading && ragText && <p>{ragText}</p>}
             {!ragLoading && !ragText && ragError && (
               <p className="rag-fallback">
-                <strong>[수학] EBS 고등예비과정 수학 I</strong><br />
-                다항식의 연산 개념 설명 구간에서 집중도가 일시적으로 하락했습니다.
-                조립제법과 나머지 정리 부분을 복습하시면 도움이 될 것입니다.
-                <br /><br />
                 <small className="rag-error-note">※ {ragError}</small>
-              </p>
-            )}
-            {!sessionId && !ragLoading && (
-              <p>
-                <strong>[수학] EBS 고등예비과정 수학 I</strong><br />
-                다항식의 연산 개념 설명 구간(10:30~10:45)에서 집중도가 60%로 하락했습니다.
-                조립제법 관련 내용에서 어려움을 느낀 것으로 보이며, 해당 구간 반복 학습을 권장합니다.
               </p>
             )}
           </div>

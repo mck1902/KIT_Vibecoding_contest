@@ -2,6 +2,8 @@
 /* TF.js 실제 추론 연동: 웹캠 → 얼굴 감지 → MobileNetV3 분류 */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { sessionAPI } from '../services/api';
 import lectures from '../data/lectures.json';
 import useWebcam from '../hooks/useWebcam';
 import useAttentionAnalysis from '../hooks/useAttentionAnalysis';
@@ -17,6 +19,7 @@ const STATUS_MAP = {
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedLecture, setSelectedLecture] = useState(lectures[0]);
   const [tabWarning, setTabWarning] = useState(false);
   const [departureCount, setDepartureCount] = useState(0);
@@ -63,7 +66,7 @@ const StudentDashboard = () => {
       }
       playerRef.current = new window.YT.Player('yt-player', {
         videoId: selectedLectureRef.current.youtubeId,
-        playerVars: { autoplay: 0, controls: 1, rel: 0, modestbranding: 1 },
+        playerVars: { autoplay: 0, controls: 1, rel: 0, modestbranding: 1, origin: window.location.origin },
         events: {
           onReady: (e) => {
             playerReadyRef.current = true;
@@ -123,17 +126,11 @@ const StudentDashboard = () => {
     const interval = setInterval(async () => {
       if (!sessionIdRef.current) return;
       try {
-        await fetch(`/api/sessions/${sessionIdRef.current}/records`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            records: [{
-              timestamp: new Date().toISOString(),
-              status: focusStatusRef.current,
-              confidence: focusLevelRef.current / 100,
-            }],
-          }),
-        });
+        await sessionAPI.addRecords(sessionIdRef.current, [{
+          timestamp: new Date().toISOString(),
+          status: focusStatusRef.current,
+          confidence: focusLevelRef.current / 100,
+        }]);
       } catch (_) {}
     }, 3000);
     return () => clearInterval(interval);
@@ -167,14 +164,10 @@ const StudentDashboard = () => {
     const duration = returnTime - tabLeaveTimeRef.current;
     if (sessionIdRef.current) {
       try {
-        await fetch(`/api/sessions/${sessionIdRef.current}/departures`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            leaveTime: tabLeaveTimeRef.current.toISOString(),
-            returnTime: returnTime.toISOString(),
-            duration,
-          }),
+        await sessionAPI.addDeparture(sessionIdRef.current, {
+          leaveTime: tabLeaveTimeRef.current.toISOString(),
+          returnTime: returnTime.toISOString(),
+          duration,
         });
       } catch (_) {}
     }
@@ -290,16 +283,7 @@ const StudentDashboard = () => {
 
   const handleStartSession = async () => {
     try {
-      const res = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId: 'demo-student-001',
-          lectureId: selectedLecture.id,
-          subject: selectedLecture.subject,
-        }),
-      });
-      const data = await res.json();
+      const data = await sessionAPI.start(selectedLecture.id, selectedLecture.subject);
       sessionIdRef.current = data._id || null;
     } catch (_) {
       sessionIdRef.current = null;
@@ -324,7 +308,7 @@ const StudentDashboard = () => {
     const sid = sessionIdRef.current;
     if (sid) {
       try {
-        await fetch(`/api/sessions/${sid}/end`, { method: 'PUT' });
+        await sessionAPI.end(sid);
         navigate(`/student/report/${sid}`);
         return;
       } catch (_) {}
@@ -345,10 +329,24 @@ const StudentDashboard = () => {
     sessionIdRef.current = null;
   };
 
-  const triggerMockDeparture = () => {
+  const triggerMockDeparture = async () => {
     if (!sessionStarted) return;
+    const leaveTime = new Date();
     handleLeave('모의 이탈');
-    setTimeout(() => handleReturn(), 4000);
+    setTimeout(async () => {
+      const returnTime = new Date();
+      const duration = returnTime - leaveTime;
+      if (sessionIdRef.current) {
+        try {
+          await sessionAPI.addDeparture(sessionIdRef.current, {
+            leaveTime: leaveTime.toISOString(),
+            returnTime: returnTime.toISOString(),
+            duration,
+          });
+        } catch (_) {}
+      }
+      handleReturn();
+    }, 4000);
   };
 
   const status = STATUS_MAP[focusStatus];
@@ -486,6 +484,22 @@ const StudentDashboard = () => {
               <span className="stat-value">{formatTime(elapsed)}</span>
             </div>
           </div>
+
+          {user?.inviteCode && (
+            <div className="invite-code-card glass">
+              <h3 className="invite-code-title">내 초대 코드</h3>
+              <div className="invite-code-row">
+                <span className="invite-code-value">{user.inviteCode}</span>
+                <button
+                  className="invite-copy-btn"
+                  onClick={() => navigator.clipboard.writeText(user.inviteCode).then(() => alert('복사되었습니다.'))}
+                >
+                  복사
+                </button>
+              </div>
+              <p className="invite-code-hint">학부모에게 이 코드를 알려주세요.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
