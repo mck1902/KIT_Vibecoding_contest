@@ -1,36 +1,42 @@
 erDiagram
-    Student {
-        String studentId PK "demo-student-001"
-        String name "김민수"
-        String grade "고등학교 2학년"
-        String parentId FK "parent-001"
-        String profileImg "null"
-    }
-
-    Parent {
-        String parentId PK "parent-001"
-        String name "김영희"
-        String email "parent@example.com"
+    User {
+        ObjectId _id PK "자동 생성"
+        String email UK "소문자 정규화"
+        String passwordHash "bcrypt 10-round"
+        String role "student | parent"
+        String name "사용자 이름"
+        String studentId "학생만 - 세션 연결용"
+        String childStudentId "학부모만 - 자녀 studentId"
+        String gradeLevel "학생만 - middle | high"
+        String inviteCode UK "6자리 초대 코드"
+        Date createdAt "자동"
+        Date updatedAt "자동"
     }
 
     Lecture {
-        String lectureId PK "lec-001"
+        ObjectId _id PK "자동 생성"
+        String lectureId UK "lec-001"
         String title "미적분 기초"
         String subject "수학"
-        Number duration "30"
-        String youtubeId "YouTube ID"
-        String subtitleText "SRT 원본 텍스트"
+        String episode "에피소드"
+        String youtubeId "YouTube 영상 ID"
+        Number durationSec "강의 시간(초)"
+        String duration "표시용 문자열"
+        String color "카드 색상"
+        String subtitleText "SRT 자막 원본"
         Array segments "Claude API 분석 결과"
-        Boolean analyzed "false"
+        Boolean analyzed "분석 완료 여부"
+        Date createdAt "자동"
+        Date updatedAt "자동"
     }
 
     Session {
         ObjectId _id PK "자동 생성"
-        String studentId FK "demo-student-001"
-        String lectureId FK "lec-001"
+        String studentId FK "User.studentId 참조"
+        String lectureId FK "Lecture.lectureId 참조"
         String subject "수학"
-        Date startTime "세션 시작 시각"
-        Date endTime "세션 종료 시각"
+        Date startTime "세션 시작"
+        Date endTime "세션 종료"
         String ragAnalysis "Claude RAG 캐시"
         Date createdAt "자동"
         Date updatedAt "자동"
@@ -66,10 +72,10 @@ erDiagram
         String explanation "해설"
     }
 
-    Student ||--o{ Session : "수강"
-    Parent ||--o{ Student : "자녀 관리"
-    Lecture ||--o{ Session : "강좌 수강"
-    Session ||--o{ Record : "집중도 기록 (3초마다)"
-    Session ||--o{ Departure : "탭 이탈 기록"
-    Session ||--o| Quiz : "복습 퀴즈"
-    Quiz ||--o{ Question : "퀴즈 문제"
+    User ||--o{ Session : "학생이 수강"
+    User ||--o| User : "학부모가 자녀 연결 (childStudentId)"
+    Lecture ||--o{ Session : "강좌별 세션"
+    Session ||--o{ Record : "집중도 기록 (내장, 3초마다)"
+    Session ||--o{ Departure : "탭 이탈 기록 (내장)"
+    Session ||--o| Quiz : "복습 퀴즈 (미구현)"
+    Quiz ||--o{ Question : "퀴즈 문제 (내장)"
