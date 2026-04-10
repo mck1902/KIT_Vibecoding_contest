@@ -1,6 +1,6 @@
 /* 2026-04-09: YouTube iframe 연동 + 세션 데이터 백엔드 연결 */
 /* TF.js 실제 추론 연동: 웹캠 → 얼굴 감지 → MobileNetV3 분류 */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import lectures from '../data/lectures.json';
 import useWebcam from '../hooks/useWebcam';
@@ -139,11 +139,14 @@ const StudentDashboard = () => {
     return () => clearInterval(interval);
   }, [sessionStarted]);
 
-  // 창이 화면 대부분을 차지하는지 확인 (90% 이상이면 전체화면으로 간주)
-  const isWindowFullscreen = useCallback(() => {
+  // 전체화면 판정: 브라우저 창 최대화 OR 영상 전체화면(Fullscreen API)
+  const isFullscreen = useCallback(() => {
+    // 1) 영상이나 페이지가 Fullscreen API 전체화면인 경우
+    if (document.fullscreenElement || document.webkitFullscreenElement) return true;
+    // 2) 브라우저 창이 화면 대부분을 차지하는 경우 (최대화)
     const widthRatio = window.outerWidth / screen.availWidth;
     const heightRatio = window.outerHeight / screen.availHeight;
-    return widthRatio >= 0.9 && heightRatio >= 0.9;
+    return widthRatio >= 0.85 && heightRatio >= 0.85;
   }, []);
 
   const [notFullscreen, setNotFullscreen] = useState(false);
@@ -188,46 +191,63 @@ const StudentDashboard = () => {
         handleLeave('탭 전환');
       } else if (document.visibilityState === 'visible') {
         // 복귀했지만 전체화면이 아니면 이탈 상태 유지
-        if (!isWindowFullscreen()) return;
+        if (!isFullscreen()) return;
         handleReturn();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [handleLeave, handleReturn, isWindowFullscreen]);
+  }, [handleLeave, handleReturn, isFullscreen]);
 
   // 2) Window blur/focus — 다른 창으로 포커스 이동
+  //    YouTube iframe 클릭 시에도 window.blur가 발생하므로,
+  //    document.hasFocus()로 페이지 전체(iframe 포함)에 포커스가 있는지 확인
   useEffect(() => {
-    const handleBlur = () => handleLeave('포커스 이탈');
+    let blurTimer = null;
+    const handleBlur = () => {
+      blurTimer = setTimeout(() => {
+        // 페이지 내 iframe에 포커스가 있으면 document.hasFocus()가 true
+        if (document.hasFocus()) return;
+        handleLeave('포커스 이탈');
+      }, 200);
+    };
     const handleFocus = () => {
-      if (!isWindowFullscreen()) return;
+      if (blurTimer) { clearTimeout(blurTimer); blurTimer = null; }
+      if (!isFullscreen()) return;
       handleReturn();
     };
     window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
     return () => {
+      if (blurTimer) clearTimeout(blurTimer);
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [handleLeave, handleReturn, isWindowFullscreen]);
+  }, [handleLeave, handleReturn, isFullscreen]);
 
-  // 3) 창 크기 감시 — 전체화면이 아니면 이탈 처리
+  // 3) 전체화면 감시 — 창 최대화 해제 또는 영상 전체화면 해제 시 이탈 처리
   useEffect(() => {
     if (!sessionStarted) return;
-    const checkSize = () => {
-      const fullscreen = isWindowFullscreen();
-      setNotFullscreen(!fullscreen);
-      if (!fullscreen) {
-        handleLeave('창 크기 축소 (전체화면 아님)');
-      } else if (fullscreen && document.hasFocus() && document.visibilityState === 'visible') {
+    const checkFullscreen = () => {
+      const fs = isFullscreen();
+      setNotFullscreen(!fs);
+      if (!fs) {
+        handleLeave('전체화면 해제');
+      } else if (fs && document.hasFocus() && document.visibilityState === 'visible') {
         handleReturn();
       }
     };
     // 세션 시작 시 즉시 체크
-    checkSize();
-    window.addEventListener('resize', checkSize);
-    return () => window.removeEventListener('resize', checkSize);
-  }, [sessionStarted, handleLeave, handleReturn, isWindowFullscreen]);
+    checkFullscreen();
+    window.addEventListener('resize', checkFullscreen);
+    document.addEventListener('fullscreenchange', checkFullscreen);
+    document.addEventListener('webkitfullscreenchange', checkFullscreen);
+    return () => {
+      window.removeEventListener('resize', checkFullscreen);
+      document.removeEventListener('fullscreenchange', checkFullscreen);
+      document.removeEventListener('webkitfullscreenchange', checkFullscreen);
+    };
+  }, [sessionStarted, handleLeave, handleReturn, isFullscreen]);
 
   // 세션 시작/종료 시 웹캠 + AI 분석 제어
   useEffect(() => {
