@@ -1,8 +1,7 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const Student = require('../models/Student');
 const Parent = require('../models/Parent');
-const { JWT_SECRET } = require('../middleware/auth');
+const { signToken } = require('../middleware/auth');
 
 const INVITE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -47,10 +46,6 @@ async function buildUserPayload(user) {
     base.childStudentIds = (populated?.children || []).map(c => c.studentId);
   }
   return base;
-}
-
-function signToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }
 
 // 코드로 상대 역할 사용자를 찾아 연결
@@ -148,7 +143,8 @@ async function register(req, res) {
     const token = signToken(payload);
     return res.status(201).json({ token, user: payload, ...(linkWarning && { linkWarning }) });
   } catch (error) {
-    return res.status(500).json({ message: '회원가입에 실패했습니다.', error: error.message });
+    console.error('[register]', error);
+    return res.status(500).json({ message: '회원가입에 실패했습니다.' });
   }
 }
 
@@ -171,7 +167,8 @@ async function login(req, res) {
     const token = signToken(payload);
     return res.status(200).json({ token, user: payload });
   } catch (error) {
-    return res.status(500).json({ message: '로그인에 실패했습니다.', error: error.message });
+    console.error('[login]', error);
+    return res.status(500).json({ message: '로그인에 실패했습니다.' });
   }
 }
 
@@ -191,7 +188,8 @@ async function me(req, res) {
     const payload = await buildUserPayload(user);
     return res.status(200).json({ user: payload });
   } catch (error) {
-    return res.status(500).json({ message: '사용자 정보를 불러오지 못했습니다.', error: error.message });
+    console.error('[me]', error);
+    return res.status(500).json({ message: '사용자 정보를 불러오지 못했습니다.' });
   }
 }
 
@@ -217,7 +215,8 @@ async function link(req, res) {
     const token = signToken(payload);
     return res.status(200).json({ token, user: payload });
   } catch (error) {
-    return res.status(500).json({ message: '연결에 실패했습니다.', error: error.message });
+    console.error('[link]', error);
+    return res.status(500).json({ message: '연결에 실패했습니다.' });
   }
 }
 
@@ -232,7 +231,8 @@ async function getChild(req, res) {
       children: parent.children.map(c => ({ name: c.name, gradeLevel: c.gradeLevel, studentId: c.studentId })),
     });
   } catch (error) {
-    return res.status(500).json({ message: '자녀 정보를 불러오지 못했습니다.', error: error.message });
+    console.error('[getChild]', error);
+    return res.status(500).json({ message: '자녀 정보를 불러오지 못했습니다.' });
   }
 }
 
@@ -245,7 +245,8 @@ async function getParent(req, res) {
     if (!parent) return res.status(200).json({ parent: null });
     return res.status(200).json({ parent: { name: parent.name, inviteCode: parent.inviteCode } });
   } catch (error) {
-    return res.status(500).json({ message: '학부모 정보를 불러오지 못했습니다.', error: error.message });
+    console.error('[getParent]', error);
+    return res.status(500).json({ message: '학부모 정보를 불러오지 못했습니다.' });
   }
 }
 
@@ -277,7 +278,8 @@ async function unlink(req, res) {
       return res.status(200).json({ token, user: payload });
     }
   } catch (error) {
-    return res.status(500).json({ message: '연결 해제에 실패했습니다.', error: error.message });
+    console.error('[unlink]', error);
+    return res.status(500).json({ message: '연결 해제에 실패했습니다.' });
   }
 }
 
@@ -304,7 +306,8 @@ async function updateProfile(req, res) {
     const token = signToken(payload);
     return res.status(200).json({ token, user: payload });
   } catch (error) {
-    return res.status(500).json({ message: '프로필 수정에 실패했습니다.', error: error.message });
+    console.error('[updateProfile]', error);
+    return res.status(500).json({ message: '프로필 수정에 실패했습니다.' });
   }
 }
 

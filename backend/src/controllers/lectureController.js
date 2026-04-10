@@ -12,7 +12,8 @@ async function getLectures(req, res) {
     }));
     return res.status(200).json(mapped);
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to get lectures.', error: error.message });
+    console.error('[getLectures]', error);
+    return res.status(500).json({ message: 'Failed to get lectures.' });
   }
 }
 
@@ -43,7 +44,8 @@ async function analyzeLecture(req, res) {
 
     return res.status(200).json({ cached: false, lecture });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to analyze lecture.', error: error.message });
+    console.error('[analyzeLecture]', error);
+    return res.status(500).json({ message: 'Failed to analyze lecture.' });
   }
 }
 

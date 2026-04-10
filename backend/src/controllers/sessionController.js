@@ -34,7 +34,8 @@ async function createSession(req, res) {
     });
     return res.status(201).json(session);
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to create session.', error: error.message });
+    console.error('[createSession]', error);
+    return res.status(500).json({ message: 'Failed to create session.' });
   }
 }
 
@@ -53,7 +54,8 @@ async function endSession(req, res) {
     await session.updateOne({ endTime: new Date() });
     return res.status(200).json({ ...session.toObject(), endTime: new Date() });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to end session.', error: error.message });
+    console.error('[endSession]', error);
+    return res.status(500).json({ message: 'Failed to end session.' });
   }
 }
 
@@ -74,7 +76,8 @@ async function addRecords(req, res) {
     await session.updateOne({ $push: { records: { $each: items } } });
     return res.status(200).json({ ok: true });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to add records.', error: error.message });
+    console.error('[addRecords]', error);
+    return res.status(500).json({ message: 'Failed to add records.' });
   }
 }
 
@@ -94,7 +97,8 @@ async function addDeparture(req, res) {
     await session.updateOne({ $push: { departures: { leaveTime, returnTime, duration } } });
     return res.status(200).json({ ok: true });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to add departure.', error: error.message });
+    console.error('[addDeparture]', error);
+    return res.status(500).json({ message: 'Failed to add departure.' });
   }
 }
 
@@ -136,7 +140,8 @@ async function getSessionReport(req, res) {
       tips,
     });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to generate report.', error: error.message });
+    console.error('[getSessionReport]', error);
+    return res.status(500).json({ message: 'Failed to generate report.' });
   }
 }
 
@@ -186,7 +191,8 @@ async function getRagAnalysis(req, res) {
 
     return res.status(200).json({ ragAnalysis: ragText, cached: false });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to generate RAG analysis.', error: error.message });
+    console.error('[getRagAnalysis]', error);
+    return res.status(500).json({ message: 'Failed to generate RAG analysis.' });
   }
 }
 
@@ -209,7 +215,8 @@ async function getSessions(req, res) {
     const sessions = await Session.find(filter).sort({ startTime: -1 });
     return res.status(200).json(sessions);
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to fetch sessions.', error: error.message });
+    console.error('[getSessions]', error);
+    return res.status(500).json({ message: 'Failed to fetch sessions.' });
   }
 }
 
@@ -227,7 +234,8 @@ async function getSessionById(req, res) {
     }
     return res.status(200).json(session);
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to fetch session.', error: error.message });
+    console.error('[getSessionById]', error);
+    return res.status(500).json({ message: 'Failed to fetch session.' });
   }
 }
 
