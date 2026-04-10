@@ -19,12 +19,13 @@ async function request(method, path, body) {
 
   const res = await fetch(`${BASE_URL}${path}`, opts);
   if (!res.ok) {
-    if (res.status === 401) {
+    const err = await res.json().catch(() => ({}));
+    // 토큰 만료/무효일 때만 강제 로그아웃 (비밀번호 오류 등 일반 401은 제외)
+    if (res.status === 401 && err.message === '유효하지 않은 토큰입니다.') {
       localStorage.removeItem('eduwatch_token');
       localStorage.removeItem('eduwatch_user');
       window.location.href = '/login';
     }
-    const err = await res.json().catch(() => ({}));
     throw new Error(err.message || `HTTP ${res.status}`);
   }
   return res.json();
@@ -37,6 +38,22 @@ export const authAPI = {
   /** 초대 코드로 상대방 연결 → { token, user } */
   link: (partnerCode) =>
     request('PUT', '/auth/link', { partnerCode }),
+
+  /** 이름·비밀번호 변경 → { token, user } */
+  updateProfile: (data) =>
+    request('PATCH', '/auth/profile', data),
+
+  /** 연결된 자녀 목록 조회 (학부모 전용) → { children: [{ name, gradeLevel, studentId }] } */
+  getChild: () =>
+    request('GET', '/auth/child'),
+
+  /** 연결된 학부모 정보 조회 (학생 전용) → { parent: { name, inviteCode } | null } */
+  getParent: () =>
+    request('GET', '/auth/parent'),
+
+  /** 연결 해제 → 학생: { message } / 학부모(전체): { token, user } / 학부모(특정 자녀): { token, user } */
+  unlink: (studentId = null) =>
+    request('DELETE', studentId ? `/auth/link?studentId=${encodeURIComponent(studentId)}` : '/auth/link'),
 };
 
 // ──────────────────────────────────────────────

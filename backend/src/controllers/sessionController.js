@@ -8,15 +8,10 @@ const { generateRagReport } = require('../utils/claudeService');
 const LECTURES_PATH = path.join(__dirname, '../../data/lectures.json');
 const STATUS_TO_FOCUS = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
 
-function resolveStudentId(user) {
-  if (user.role === 'student') return user.studentId;
-  if (user.role === 'parent') return user.childStudentId;
-  return null;
-}
-
 function hasSessionAccess(user, session) {
-  const allowedId = resolveStudentId(user);
-  return allowedId && session.studentId === allowedId;
+  if (user.role === 'student') return user.studentId === session.studentId;
+  if (user.role === 'parent') return Array.isArray(user.childStudentIds) && user.childStudentIds.includes(session.studentId);
+  return false;
 }
 
 function calcAvgFocus(records) {
@@ -208,10 +203,10 @@ async function getSessions(req, res) {
     if (req.user.role === 'student') {
       filter.studentId = req.user.studentId;
     } else if (req.user.role === 'parent') {
-      if (!req.user.childStudentId) {
+      if (!req.user.childStudentIds?.length) {
         return res.status(200).json([]);
       }
-      filter.studentId = req.user.childStudentId;
+      filter.studentId = { $in: req.user.childStudentIds };
     }
 
     if (lectureId) filter.lectureId = lectureId;

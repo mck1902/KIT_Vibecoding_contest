@@ -15,8 +15,8 @@ const userSchema = new mongoose.Schema(
         message: 'studentId는 학생 계정에 필수입니다.',
       },
     },
-    // role=parent일 때 자녀 studentId
-    childStudentId: { type: String, default: null },
+    // role=parent일 때 자녀 studentId 목록 (다자녀 지원)
+    childStudentIds: { type: [String], default: [] },
     // role=student일 때 학교급: 'middle'(중학생) | 'high'(고등학생)
     gradeLevel: { type: String, enum: ['middle', 'high', null], default: null },
     // 가입 시 발급되는 고유 초대 코드 (학생/학부모 모두)
@@ -27,7 +27,7 @@ const userSchema = new mongoose.Schema(
 
 // 역할과 반대되는 필드 강제 초기화
 userSchema.pre('save', async function () {
-  if (this.role === 'student') this.childStudentId = null;
+  if (this.role === 'student') this.childStudentIds = [];
   if (this.role === 'parent') this.studentId = null;
 });
 

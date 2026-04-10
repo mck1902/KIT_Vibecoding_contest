@@ -11,6 +11,7 @@ import ParentDashboard from './pages/ParentDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import SessionReport from './pages/SessionReport';
 import Features from './pages/Features';
+import ProfileSettings from './pages/ProfileSettings';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
               <Route path="/parent" element={<ProtectedRoute role="parent"><ParentDashboard /></ProtectedRoute>} />
               <Route path="/student" element={<ProtectedRoute role="student"><StudentDashboard /></ProtectedRoute>} />
               <Route path="/student/report/:sessionId" element={<ProtectedRoute role="student"><SessionReport /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><ProfileSettings /></ProtectedRoute>} />
             </Routes>
           </div>
 

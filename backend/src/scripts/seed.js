@@ -14,7 +14,7 @@ const users = [
     studentId: DEMO_STUDENT_ID,
     gradeLevel: 'high',
     inviteCode: 'DEMO01',
-    childStudentId: null,
+    childStudentIds: [],
   },
   {
     email: 'parent@demo.com',
@@ -24,7 +24,7 @@ const users = [
     studentId: null,
     gradeLevel: null,
     inviteCode: 'DEMO02',
-    childStudentId: DEMO_STUDENT_ID,
+    childStudentIds: [DEMO_STUDENT_ID],
   },
 ];
 
@@ -39,7 +39,7 @@ async function seed() {
       await User.findByIdAndUpdate(existing._id, {
         inviteCode: u.inviteCode,
         gradeLevel: u.gradeLevel,
-        childStudentId: u.childStudentId,
+        childStudentIds: u.childStudentIds,
       });
       console.log(`[UPDATE] ${u.email} → inviteCode: ${u.inviteCode}`);
       continue;
@@ -51,7 +51,7 @@ async function seed() {
       role: u.role,
       name: u.name,
       studentId: u.studentId,
-      childStudentId: u.childStudentId,
+      childStudentIds: u.childStudentIds,
       gradeLevel: u.gradeLevel,
       inviteCode: u.inviteCode,
     });

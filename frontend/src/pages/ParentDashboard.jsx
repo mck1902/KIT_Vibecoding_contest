@@ -27,6 +27,7 @@ function formatDuration(sec) {
 const ParentDashboard = () => {
   const { user, updateUser } = useAuth();
 
+  const [childNames, setChildNames] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [linkCode, setLinkCode] = useState('');
@@ -39,9 +40,12 @@ const ParentDashboard = () => {
   const [ragError, setRagError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 자녀 세션 목록 불러오기 (childStudentId 변경 시 재조회)
+  // 자녀 이름 + 세션 목록 불러오기 (childStudentIds 변경 시 재조회)
   useEffect(() => {
-    if (!user?.childStudentId) { setSessions([]); return; }
+    if (!user?.childStudentIds?.length) { setSessions([]); setChildNames([]); return; }
+    authAPI.getChild()
+      .then(data => { if (data.children?.length) setChildNames(data.children.map(c => c.name)); })
+      .catch(() => {});
     sessionAPI.getAll()
       .then(data => {
         if (Array.isArray(data)) {
@@ -50,7 +54,7 @@ const ParentDashboard = () => {
         }
       })
       .catch(() => {});
-  }, [user?.childStudentId]);
+  }, [user?.childStudentIds?.join(',')]);
 
   // 세션 리포트 불러오기
   useEffect(() => {
@@ -110,7 +114,7 @@ const ParentDashboard = () => {
       <header className="dashboard-header">
         <h2>학습 대시보드</h2>
         <p className="subtitle">
-          {user?.name ? `${user.name}님의 자녀 학습 리포트` : '학습 리포트'}
+          {childNames.length > 0 ? `${childNames.join(', ')}의 학습 리포트` : user?.childStudentIds?.length ? '학습 리포트' : '자녀를 연결해주세요'}
           {loading && <span className="loading-tag"> · 불러오는 중...</span>}
         </p>
 
@@ -128,7 +132,7 @@ const ParentDashboard = () => {
         )}
 
         {/* 자녀 미연결 시 연결 폼 */}
-        {!user?.childStudentId && (
+        {(!user?.childStudentIds?.length || true) && (
           <form className="link-form" onSubmit={handleLink}>
             <span className="link-form-label">자녀 초대 코드</span>
             <input
@@ -159,7 +163,7 @@ const ParentDashboard = () => {
             ))}
           </select>
         )}
-        {user?.childStudentId && sessions.length === 0 && !loading && (
+        {user?.childStudentIds?.length > 0 && sessions.length === 0 && !loading && (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
             자녀의 세션이 없습니다. 학생 계정으로 세션을 시작해보세요.
           </p>

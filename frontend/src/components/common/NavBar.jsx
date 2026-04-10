@@ -1,12 +1,13 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { FiSun, FiMoon, FiLogOut } from 'react-icons/fi';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { FiSun, FiMoon, FiLogOut, FiSettings } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
 import './NavBar.css';
 
 const NavBar = ({ theme, toggleTheme }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -37,6 +38,13 @@ const NavBar = ({ theme, toggleTheme }) => {
           {user ? (
             <div className="nav-user">
               <span className="nav-username">{user.name}</span>
+              <Link
+                to="/settings"
+                className={`btn-settings${location.pathname === '/settings' ? ' active' : ''}`}
+                title="설정"
+              >
+                <FiSettings size={18} />
+              </Link>
               <button className="btn-logout" onClick={handleLogout} title="로그아웃">
                 <FiLogOut size={18} />
               </button>

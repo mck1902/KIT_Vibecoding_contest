@@ -1,6 +1,6 @@
 # EduWatch 개발 작업 내역
 
-> 작성일: 2026-04-09 | 공모전 마감: 2026-04-13
+> 최종 수정: 2026-04-10 | 공모전 마감: 2026-04-13
 
 ---
 
@@ -8,18 +8,130 @@
 
 | 항목 | 상태 |
 |------|------|
-| 프론트엔드 UI | ✅ 완료 (4페이지 + 공통 컴포넌트) |
+| 프론트엔드 UI | ✅ 완료 (6페이지 + 공통 컴포넌트) |
 | YouTube 강의 영상 연동 | ✅ 완료 (EBS 3개) |
 | 백엔드 세션 API | ✅ 완료 (CRUD + 기록/이탈/종료) |
 | Claude API 자막 분석 | ✅ 완료 |
 | Claude RAG 맞춤형 리포트 | ✅ 완료 |
 | 프론트-백엔드 실데이터 연결 | ✅ 완료 |
-| TF.js 웹캠 연동 | ❌ 미구현 |
+| JWT 인증 시스템 (로그인/회원가입) | ✅ 완료 |
+| 회원 정보 수정 (초대코드/이름/비밀번호) | ✅ 완료 |
+| TF.js 웹캠 연동 | ⚠️ 모델 준비됨, 코드 연동 보류 |
 | 배포 (Vercel + Render) | ❌ 미구현 |
 
 ---
 
 ## 작업 내역 (날짜순)
+
+### 2026-04-10 (3) | 다자녀 지원 스키마 마이그레이션
+
+#### User 모델 변경 (`backend/src/models/User.js`)
+
+| 변경 전 | 변경 후 | 이유 |
+|---------|---------|------|
+| `childStudentId: String` | `childStudentIds: [String]` | 학부모 1명이 여러 자녀를 모니터링 |
+
+#### authController 전체 반영
+
+- `generateToken`, `userPayload` — `childStudentIds` 배열로 교체
+- `linkByCode` — `$push: { childStudentIds }` (중복 방지 포함)
+- `link` — 학생/학부모 모두 `$push` + 중복 시 409 반환
+- `getChild` — 단일 객체 → `children` 배열 반환 (`User.find({ studentId: { $in: [...] } })`)
+- `getParent` — `childStudentIds: student.studentId` 조건으로 학부모 조회
+- `unlink`
+  - 학생: `User.updateMany({ childStudentIds: studentId }, $pull)` — 연결된 모든 학부모에서 제거
+  - 학부모: `?studentId=` 쿼리 파라미터로 특정 자녀만 제거, 없으면 전체 해제 (`$set: []`)
+
+#### 시드 스크립트 업데이트 (`backend/src/scripts/seed.js`)
+- 데모 학부모 계정: `childStudentIds: [DEMO_STUDENT_ID]` 배열로 변경
+- 기존 계정 업데이트 시 `childStudentIds` 갱신
+
+> **⚠️ 프론트엔드 영향**: `user.childStudentId` → `user.childStudentIds` (배열), `getChild()` 응답 `child` → `children` 배열로 변경됨. 관련 UI 코드 업데이트 필요.
+
+---
+
+### 2026-04-10 (2) | 연결 해제 기능 + 비밀번호 버그 수정
+
+#### 학생 → 학부모 연결 해제
+
+**Backend 추가**
+- `GET /api/auth/parent` — 학생 `studentId`로 연결된 학부모 조회 (`name`, `inviteCode` 반환)
+- `DELETE /api/auth/link` — 연결 해제
+  - 학생: 학부모의 `childStudentId` null 처리
+  - 학부모: 본인 `childStudentId` null 처리 + 새 토큰 발급
+
+**Frontend 추가**
+- `authAPI.getParent()`, `authAPI.unlink()` 추가 (`services/api.js`)
+- `ProfileSettings.jsx` — 학생 마운트 시 학부모 정보 조회
+  - 연결됨: 학부모 이름 + 초대 코드 표시, 입력 칸 비활성화
+  - "연결 해제" 버튼 → 인라인 확인 UI 전환 (`window.confirm` 미사용)
+  - [취소] / [해제] 버튼으로 처리, 완료 후 상태 초기화
+
+#### 비밀번호 변경 버그 수정
+
+**원인**: `PATCH /api/auth/profile`에서 현재 비밀번호 불일치 시 `401` 반환
+→ `api.js`의 `request()`가 401을 토큰 만료로 오인해 로그아웃 + `/login` 리다이렉트
+
+**수정 1 — Backend** (`authController.js`)
+- 현재 비밀번호 불일치 응답: `401` → `400` 변경
+- `401`은 토큰 무효/만료에만 사용하도록 의미 분리
+
+**수정 2 — Frontend** (`api.js`)
+- 기존: 401 응답이면 무조건 로그아웃
+- 변경: `err.message === '유효하지 않은 토큰입니다.'`일 때만 로그아웃 처리
+- 비밀번호 불일치 등 일반 오류는 에러 메시지만 표시
+
+---
+
+### 2026-04-10 | Day 5: 인증 시스템 + 회원 정보 수정
+
+#### 인증 시스템 (JWT)
+
+**Backend 신규**
+- `backend/src/models/User.js` — User 스키마 (email, passwordHash, role, name, studentId, childStudentId, gradeLevel, inviteCode)
+- `backend/src/middleware/auth.js` — `requireAuth` (JWT 검증), `requireRole`
+- `backend/src/controllers/authController.js` — register / login / me / link / updateProfile / getChild
+- `backend/src/routes/auth.js` — `/api/auth/*` 라우트 전체
+- `backend/src/scripts/seed.js` — 데모 계정 2개 (student@demo.com / parent@demo.com)
+
+**Auth API 엔드포인트**
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/api/auth/register` | 회원가입 (inviteCode 자동 발급, partnerCode 연결 옵션) |
+| POST | `/api/auth/login` | 로그인 → JWT 발급 |
+| GET | `/api/auth/me` | 내 정보 조회 (inviteCode null이면 자동 발급) |
+| PUT | `/api/auth/link` | 초대 코드로 학생↔학부모 연결 |
+| PATCH | `/api/auth/profile` | 이름·비밀번호 변경 |
+| GET | `/api/auth/child` | 연결된 자녀 정보 조회 (학부모 전용) |
+
+**Frontend 신규/수정**
+- `frontend/src/contexts/AuthContext.jsx` — user/token 전역 관리, login/register/logout/updateUser
+- `frontend/src/components/common/ProtectedRoute.jsx` — role 기반 보호 라우트
+- `frontend/src/pages/Login.jsx` — 이메일+비밀번호 로그인 폼
+- `frontend/src/pages/Register.jsx` — 역할 선택, 학교급, 초대 코드 입력 포함 회원가입
+- `frontend/src/pages/ProfileSettings.jsx` — 계정 정보 / 자녀 정보 / 초대 코드 / 이름 변경 / 비밀번호 변경
+- `frontend/src/components/common/NavBar.jsx` — 로그인 상태 반영, ⚙ 설정 아이콘 추가
+- `frontend/src/App.jsx` — 보호 라우트 적용, `/settings` 추가
+
+#### StudentDashboard sessionAPI 연동
+
+- raw `fetch()` 5곳 → `sessionAPI.*` 서비스 호출로 교체
+- `useAuth`로 로그인 사용자 연동
+- 사이드바에 초대 코드 카드 추가 (`user?.inviteCode`)
+
+#### ParentDashboard 자녀 이름 표시
+
+- `authAPI.getChild()` 호출로 자녀 이름 조회
+- subtitle: `${childName}의 학습 리포트` (미연결 시 "자녀를 연결해주세요")
+
+#### 버그 수정 / 환경 설정
+
+- 백엔드 포트 5000 → **5001** 변경 (`backend/.env`, Vite proxy 정합)
+- `GET /api/auth/me`에서 inviteCode 없는 기존 계정 자동 발급 (lazy migration)
+- 비밀번호 변경 성공 시 성공 화면 전환 후 [확인] 버튼으로만 폼 초기화
+
+---
 
 ### 2026-04-06 ~ 07 | Day 1–2: 기반 구축
 
@@ -344,19 +456,19 @@ POST /api/lectures/:id/analyze
 - [x] `services/api.js` 작성 — 백엔드 API 호출 함수 전체 ✅
 - [x] `StudentDashboard` → 세션 시작/종료/기록/이탈 API 연동 ✅
 - [x] `SessionReport.jsx` 신규 구현 (리포트 + RAG 결과 표시) ✅
+- [x] JWT 인증 시스템 구현 (로그인/회원가입/보호 라우트) ✅
+- [x] 회원 정보 수정 페이지 (초대코드/이름/비밀번호) ✅
 - [ ] `ANTHROPIC_API_KEY` 설정 후 3개 강좌 자막 분석 실행
   ```bash
-  curl -X POST http://localhost:5000/api/lectures/lec-001/analyze
-  curl -X POST http://localhost:5000/api/lectures/lec-002/analyze
-  curl -X POST http://localhost:5000/api/lectures/lec-003/analyze
+  curl -X POST http://localhost:5001/api/lectures/lec-001/analyze
+  curl -X POST http://localhost:5001/api/lectures/lec-002/analyze
+  curl -X POST http://localhost:5001/api/lectures/lec-003/analyze
   ```
 - [ ] 전체 데모 흐름 E2E 테스트 (강의 시작 → 세션 종료 → 리포트 → RAG 확인)
 
 ### 🟡 있으면 좋음
 
-- [ ] `ParentDashboard` 실데이터 연동 (`GET /api/sessions?studentId=demo-student-001`)
-- [ ] TensorFlow.js 웹캠 연동 (`@tensorflow/tfjs`, `@tensorflow-models/face-landmarks-detection`)
-- [ ] 실제 MobileNet V3 집중도 분류 (시뮬레이션 대체)
+- [ ] TensorFlow.js 웹캠 + 실제 MobileNet V3 집중도 분류 연동
 - [ ] 학부모 주간 리포트 API (`GET /api/students/:id/weekly`)
 
 ### 🟢 배포 (4/12)
