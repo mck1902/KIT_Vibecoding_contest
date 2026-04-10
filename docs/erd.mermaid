@@ -1,0 +1,75 @@
+erDiagram
+    Student {
+        String studentId PK "demo-student-001"
+        String name "김민수"
+        String grade "고등학교 2학년"
+        String parentId FK "parent-001"
+        String profileImg "null"
+    }
+
+    Parent {
+        String parentId PK "parent-001"
+        String name "김영희"
+        String email "parent@example.com"
+    }
+
+    Lecture {
+        String lectureId PK "lec-001"
+        String title "미적분 기초"
+        String subject "수학"
+        Number duration "30"
+        String youtubeId "YouTube ID"
+        String subtitleText "SRT 원본 텍스트"
+        Array segments "Claude API 분석 결과"
+        Boolean analyzed "false"
+    }
+
+    Session {
+        ObjectId _id PK "자동 생성"
+        String studentId FK "demo-student-001"
+        String lectureId FK "lec-001"
+        String subject "수학"
+        Date startTime "세션 시작 시각"
+        Date endTime "세션 종료 시각"
+        String ragAnalysis "Claude RAG 캐시"
+        Date createdAt "자동"
+        Date updatedAt "자동"
+    }
+
+    Record {
+        Date timestamp "기록 시각"
+        Number status "1~5 집중도 분류"
+        Number confidence "0~1 신뢰도"
+    }
+
+    Departure {
+        Date leaveTime "이탈 시각"
+        Date returnTime "복귀 시각"
+        Number duration "이탈 시간 ms"
+    }
+
+    Quiz {
+        ObjectId _id PK "자동 생성"
+        String sessionId FK "세션 ID"
+        String lectureId FK "강좌 ID"
+        Array questions "퀴즈 문제 배열"
+        Number score "정답 수"
+        Number total "총 문제 수"
+        Date completedAt "풀이 완료 시각"
+        Date generatedAt "생성 시각"
+    }
+
+    Question {
+        String question "문제 텍스트"
+        Array options "선택지 4개"
+        Number answer "정답 인덱스"
+        String explanation "해설"
+    }
+
+    Student ||--o{ Session : "수강"
+    Parent ||--o{ Student : "자녀 관리"
+    Lecture ||--o{ Session : "강좌 수강"
+    Session ||--o{ Record : "집중도 기록 (3초마다)"
+    Session ||--o{ Departure : "탭 이탈 기록"
+    Session ||--o| Quiz : "복습 퀴즈"
+    Quiz ||--o{ Question : "퀴즈 문제"
