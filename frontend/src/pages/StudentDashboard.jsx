@@ -139,38 +139,95 @@ const StudentDashboard = () => {
     return () => clearInterval(interval);
   }, [sessionStarted]);
 
-  // Page Visibility API — 탭 이탈 감지
+  // 창이 화면 대부분을 차지하는지 확인 (90% 이상이면 전체화면으로 간주)
+  const isWindowFullscreen = useCallback(() => {
+    const widthRatio = window.outerWidth / screen.availWidth;
+    const heightRatio = window.outerHeight / screen.availHeight;
+    return widthRatio >= 0.9 && heightRatio >= 0.9;
+  }, []);
+
+  const [notFullscreen, setNotFullscreen] = useState(false);
+
+  // 이탈 시작 처리 (공통)
+  const handleLeave = useCallback((reason) => {
+    if (!sessionStarted || tabLeaveTimeRef.current) return;
+    tabLeaveTimeRef.current = new Date();
+    setTabWarning(true);
+    setDepartureCount(prev => prev + 1);
+    console.log(`[EduWatch] 이탈 감지: ${reason}`);
+  }, [sessionStarted]);
+
+  // 복귀 처리 (공통)
+  const handleReturn = useCallback(async () => {
+    if (!tabLeaveTimeRef.current) return;
+    const returnTime = new Date();
+    const duration = returnTime - tabLeaveTimeRef.current;
+    if (sessionIdRef.current) {
+      try {
+        await fetch(`/api/sessions/${sessionIdRef.current}/departures`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            leaveTime: tabLeaveTimeRef.current.toISOString(),
+            returnTime: returnTime.toISOString(),
+            duration,
+          }),
+        });
+      } catch (_) {}
+    }
+    tabLeaveTimeRef.current = null;
+    setTimeout(() => {
+      setTabWarning(false);
+    }, 2000);
+  }, []);
+
+  // 1) Page Visibility API — 탭 완전히 숨겨짐
   useEffect(() => {
-    const handleVisibility = async () => {
-      if (document.visibilityState === 'hidden' && sessionStarted) {
-        tabLeaveTimeRef.current = new Date();
-        setTabWarning(true);
-        setDepartureCount(prev => prev + 1);
-      } else if (document.visibilityState === 'visible' && tabLeaveTimeRef.current) {
-        const returnTime = new Date();
-        const duration = returnTime - tabLeaveTimeRef.current;
-        if (sessionIdRef.current) {
-          try {
-            await fetch(`/api/sessions/${sessionIdRef.current}/departures`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                leaveTime: tabLeaveTimeRef.current.toISOString(),
-                returnTime: returnTime.toISOString(),
-                duration,
-              }),
-            });
-          } catch (_) {}
-        }
-        tabLeaveTimeRef.current = null;
-        setTimeout(() => {
-          setTabWarning(false);
-        }, 2000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        handleLeave('탭 전환');
+      } else if (document.visibilityState === 'visible') {
+        // 복귀했지만 전체화면이 아니면 이탈 상태 유지
+        if (!isWindowFullscreen()) return;
+        handleReturn();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [sessionStarted]);
+  }, [handleLeave, handleReturn, isWindowFullscreen]);
+
+  // 2) Window blur/focus — 다른 창으로 포커스 이동
+  useEffect(() => {
+    const handleBlur = () => handleLeave('포커스 이탈');
+    const handleFocus = () => {
+      if (!isWindowFullscreen()) return;
+      handleReturn();
+    };
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [handleLeave, handleReturn, isWindowFullscreen]);
+
+  // 3) 창 크기 감시 — 전체화면이 아니면 이탈 처리
+  useEffect(() => {
+    if (!sessionStarted) return;
+    const checkSize = () => {
+      const fullscreen = isWindowFullscreen();
+      setNotFullscreen(!fullscreen);
+      if (!fullscreen) {
+        handleLeave('창 크기 축소 (전체화면 아님)');
+      } else if (fullscreen && document.hasFocus() && document.visibilityState === 'visible') {
+        handleReturn();
+      }
+    };
+    // 세션 시작 시 즉시 체크
+    checkSize();
+    window.addEventListener('resize', checkSize);
+    return () => window.removeEventListener('resize', checkSize);
+  }, [sessionStarted, handleLeave, handleReturn, isWindowFullscreen]);
 
   // 세션 시작/종료 시 웹캠 + AI 분석 제어
   useEffect(() => {
@@ -268,29 +325,10 @@ const StudentDashboard = () => {
     sessionIdRef.current = null;
   };
 
-  const triggerMockDeparture = async () => {
+  const triggerMockDeparture = () => {
     if (!sessionStarted) return;
-    const leaveTime = new Date();
-    setTabWarning(true);
-    setDepartureCount(prev => prev + 1);
-    setTimeout(async () => {
-      const returnTime = new Date();
-      const duration = returnTime - leaveTime;
-      if (sessionIdRef.current) {
-        try {
-          await fetch(`/api/sessions/${sessionIdRef.current}/departures`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              leaveTime: leaveTime.toISOString(),
-              returnTime: returnTime.toISOString(),
-              duration,
-            }),
-          });
-        } catch (_) {}
-      }
-      setTabWarning(false);
-    }, 4000);
+    handleLeave('모의 이탈');
+    setTimeout(() => handleReturn(), 4000);
   };
 
   const status = STATUS_MAP[focusStatus];
@@ -331,7 +369,9 @@ const StudentDashboard = () => {
 
       {tabWarning && (
         <div className="tab-warning-banner">
-          ⚠️ 탭 이탈이 감지되었습니다. 집중도가 기록되고 있습니다. 학습 창으로 돌아와주세요!
+          {notFullscreen
+            ? '⚠️ 창을 전체화면으로 전환해주세요! 전체화면이 아니면 이탈로 기록됩니다.'
+            : '⚠️ 탭 이탈이 감지되었습니다. 집중도가 기록되고 있습니다. 학습 창으로 돌아와주세요!'}
         </div>
       )}
 
