@@ -361,7 +361,69 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 ---
 
-## 10. 강좌 API (routes/lectures.js)
+## 10. 퀴즈 생성 API
+
+### Claude API 기반 퀴즈 자동 생성
+세션에서 집중도가 낮았던 구간의 강의 내용을 기반으로 복습 퀴즈를 생성.
+
+#### GET /api/sessions/:id/quiz
+- 해당 세션의 집중도 데이터 + 강좌 segments를 분석
+- 집중도 낮은 구간(avgStatus >= 3)의 자막/주제를 추출
+- Claude API에 객관식 퀴즈 생성 요청
+- 캐싱: 이미 생성된 퀴즈가 있으면 재사용
+
+응답:
+```json
+{
+  "sessionId": "sess-1712500000",
+  "questions": [
+    {
+      "question": "삼차방정식의 인수분해에서 조립제법을 사용하는 이유는?",
+      "options": ["고차 다항식을 빠르게 나눌 수 있어서", "답이 항상 정수이므로", "이차방정식으로 변환 불가능해서", "그래프를 그리기 위해서"],
+      "answer": 0,
+      "explanation": "조립제법은 삼차 이상의 다항식을 일차식으로 나눌 때 효율적인 방법입니다."
+    }
+  ],
+  "targetSegments": ["삼차방정식 풀이법", "인수분해 응용"],
+  "generatedAt": "2026-04-07T15:00:00.000Z"
+}
+```
+
+#### POST /api/sessions/:id/quiz/submit
+요청:
+```json
+{
+  "answers": [0, 2, 1]
+}
+```
+응답:
+```json
+{
+  "score": 2,
+  "total": 3,
+  "details": [
+    { "questionIndex": 0, "correct": true },
+    { "questionIndex": 1, "correct": false, "correctAnswer": 1, "explanation": "..." },
+    { "questionIndex": 2, "correct": true }
+  ]
+}
+```
+
+### claudeService.js 추가 함수
+```javascript
+// generateQuiz(subtitleText, segments, lowFocusSegments)
+// → 집중도 낮은 구간의 핵심 내용으로 객관식 3~5문제 생성
+// → 반환: { questions: [{ question, options[4], answer, explanation }] }
+//
+// 프롬프트 핵심:
+// "다음은 학생이 집중하지 못한 강의 구간의 내용입니다.
+//  이 구간의 핵심 개념을 확인하는 객관식 퀴즈 3문제를 생성해주세요.
+//  난이도는 해당 과목의 수준에 맞추고, 오답 선택지도 그럴듯하게 만들어주세요."
+```
+
+---
+
+## 11. 강좌 API (routes/lectures.js)
 
 | Method | Path | 설명 |
 |--------|------|------|
