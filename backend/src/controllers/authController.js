@@ -64,9 +64,22 @@ async function linkByCode(caller, partnerCode) {
   if (partner.role === caller.role) return { linked: false, message: '같은 역할의 초대 코드는 사용할 수 없습니다.' };
 
   if (caller.role === 'student') {
+    // BUG-03: 학생은 한 명의 학부모에만 연결 가능
+    const existingParent = await Parent.findOne({ children: caller._id });
+    if (existingParent) {
+      if (existingParent._id.equals(partner._id)) {
+        return { linked: false, message: '이미 연결된 학부모입니다.' };
+      }
+      return { linked: false, message: '이미 연결된 학부모가 있습니다. 먼저 연결을 해제해주세요.' };
+    }
     // 학생이 학부모 코드 입력 → 학부모의 children에 학생 추가
     await Parent.findByIdAndUpdate(partner._id, { $addToSet: { children: caller._id } });
   } else {
+    // BUG-01: 이미 연결된 자녀 중복 체크
+    const alreadyLinked = caller.children.some(c => c.equals(partner._id));
+    if (alreadyLinked) {
+      return { linked: false, message: '이미 연결된 자녀입니다.' };
+    }
     // 학부모가 학생 코드 입력 → 내 children에 학생 추가
     await Parent.findByIdAndUpdate(caller._id, { $addToSet: { children: partner._id } });
   }

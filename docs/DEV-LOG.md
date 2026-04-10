@@ -16,12 +16,113 @@
 | 프론트-백엔드 실데이터 연결 | ✅ 완료 |
 | JWT 인증 시스템 (로그인/회원가입) | ✅ 완료 |
 | 회원 정보 수정 (초대코드/이름/비밀번호) | ✅ 완료 |
+| Student/Parent 분리 모델 + 다자녀 지원 | ✅ 완료 |
+| 초대 코드 연결 버그 수정 (3건) | ✅ 완료 |
+| 학부모 대시보드 자녀 선택 필터 | ✅ 완료 |
 | TF.js 웹캠 연동 | ⚠️ 모델 준비됨, 코드 연동 보류 |
 | 배포 (Vercel + Render) | ❌ 미구현 |
 
 ---
 
 ## 작업 내역 (날짜순)
+
+### 2026-04-10 (6) | 학부모 대시보드 UX 개선 — 자녀 선택 필터 + ProfileSettings 닫기 버튼
+
+#### 학부모 대시보드 자녀 선택 드롭다운 (`frontend/src/pages/ParentDashboard.jsx`)
+
+다자녀 환경에서 특정 자녀의 세션만 필터링하여 조회할 수 있도록 추가.
+
+- `selectedChild` state 추가 (null = 전체)
+- `filteredSessions` — `selectedChild`가 있으면 `sessions.filter(s => s.studentId === selectedChild.studentId)`, 없으면 전체
+- `handleChildSelect(child)` — 자녀 변경 시 `report`, `ragText` 초기화 후 해당 자녀의 첫 세션 자동 선택
+- 자녀가 2명 이상일 때만 `<select>` 드롭다운 표시 (1명이면 생략)
+  - "전체 자녀 (N명)" 옵션이 기본값
+  - 각 옵션: `{이름} ({고등|중등})` 형식
+- 세션 드롭다운도 `filteredSessions` 기준으로 변경
+- 헤더 subtitle: 선택된 자녀 이름 / "전체 자녀 (N명)" / "자녀를 연결해주세요" 동적 표시
+
+**CSS 추가 (`frontend/src/pages/ParentDashboard.css`)**
+
+`.session-select` — 자녀/세션 공통 드롭다운 스타일 (둥근 테두리, primary focus, 최대 360px)
+
+#### ProfileSettings 닫기 버튼 (`frontend/src/pages/ProfileSettings.jsx`)
+
+- 헤더 우측에 `✕` 버튼 추가
+- 학부모: `/parent` / 학생: `/student` 로 `navigate()` 이동
+- `.settings-close-btn` CSS: 원형, hover 시 배경색 전환
+
+---
+
+### 2026-04-10 (5) | Student/Parent 분리 모델 + 초대 코드 연결 버그 수정
+
+#### 모델 분리 (`backend/src/models/`)
+
+단일 `User.js` → 역할별 별도 모델로 완전 분리. 계획: `docs/LINK-BUG-FIX-PLAN.md` 참고.
+
+| 파일 | 역할 | 핵심 필드 |
+|------|------|---------|
+| `Student.js` | 학생 계정 | `email`, `passwordHash`, `name`, `studentId`, `gradeLevel`, `inviteCode` |
+| `Parent.js` | 학부모 계정 | `email`, `passwordHash`, `name`, `children: [ObjectId ref 'Student']`, `inviteCode` |
+
+- `role` 필드: `default`로 고정, `immutable: true` 설정 (변경 불가)
+- 학부모의 자녀 목록은 `ObjectId` 참조 배열 (`$addToSet` / `$pull` 운용)
+
+#### authController 전체 재작성 (`backend/src/controllers/authController.js`)
+
+**`buildUserPayload(user)`**
+- 학부모인 경우 `Parent.findById().populate('children')` 재조회
+- `childStudentIds: children.map(c => c.studentId)` — 문자열 배열로 JWT에 포함
+- sessionController의 `$in` 필터가 이 배열을 사용
+
+**`register`**
+- `Student` / `Parent` 모델 분기 생성
+- `partnerCode` 입력 시 `linkByCode()` 즉시 호출
+
+**`linkByCode(caller, partnerCode)`**
+- Student/Parent 두 컬렉션 모두 조회해 초대 코드 소유자 확인
+- BUG-01 수정 (학부모 중복 연결 차단):
+  ```js
+  const alreadyLinked = caller.children.some(c => c.equals(partner._id));
+  if (alreadyLinked) return { linked: false, message: '이미 연결된 자녀입니다.' };
+  ```
+- BUG-03 수정 (학생 다중 학부모 연결 차단):
+  ```js
+  const existingParent = await Parent.findOne({ children: caller._id });
+  if (existingParent) return { linked: false, message: '이미 연결된 학부모가 있습니다. 먼저 연결을 해제해주세요.' };
+  ```
+
+**`unlink`**
+- 학생: `Parent.updateMany({ children: student._id }, { $pull: { children: student._id } })`
+- 학부모: `?studentId=` 쿼리 파라미터로 특정 자녀만 해제, 없으면 전체 해제
+
+**`getChild`** — `Parent.findById().populate('children')` → `{ children: [...] }` 배열 반환
+
+**`getParent`** — `Parent.findOne({ children: student._id })` → 학생에게 연결된 학부모 반환
+
+#### sessionController 반영 (`backend/src/controllers/sessionController.js`)
+
+- `hasSessionAccess`: 부모 → `user.childStudentIds.includes(session.studentId)` 배열 체크
+- `getSessions`: 부모 필터 → `{ studentId: { $in: childStudentIds } }` (전체 자녀 세션 통합 조회)
+
+#### 프론트엔드 반영
+
+**`frontend/src/services/api.js`**
+- `getChild()` → `{ children: [] }` 배열 응답 처리
+- `unlink(studentId?)` → `?studentId=` 쿼리 파라미터 지원
+
+**`frontend/src/pages/ProfileSettings.jsx`**
+- `childInfo` → `children[]` 배열 state로 전환
+- "연결된 자녀" 섹션: 자녀 목록 + 각 자녀별 개별 "연결 해제" 버튼
+- `handleUnlink(studentId?)` — 특정 자녀 studentId 전달로 개별 해제
+- BUG-02 수정: `handleLink` 완료 후 학생 역할이면 `authAPI.getParent()` 재조회 → `setParentInfo` 즉시 반영
+
+**`frontend/src/pages/ParentDashboard.jsx`**
+- `children[]` 배열 state로 전환 (이름, gradeLevel, studentId 포함)
+- 자녀 연결 폼: 항상 표시 (다자녀 추가 연결 허용)
+
+> **⚠️ DB 초기화 필요**: 기존 `User` 컬렉션은 사용하지 않음. `npm run seed`로 데모 계정 재생성 필요.
+
+---
 
 ### 2026-04-10 (4) | 보안 강화 — CORS 제한 / 레이트 리밋 / 입력값 검증
 

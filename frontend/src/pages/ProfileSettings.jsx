@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../services/api';
 import './ProfileSettings.css';
@@ -8,6 +9,7 @@ const GRADE_LABEL = { middle: '중학생', high: '고등학생' };
 
 const ProfileSettings = () => {
   const { user, updateUser } = useAuth();
+  const navigate = useNavigate();
 
   // 초대 코드 복사
   const [copied, setCopied] = useState(false);
@@ -92,9 +94,11 @@ const ProfileSettings = () => {
       setLinkStatus('success');
       setLinkMessage('연결되었습니다!');
       setPartnerCode('');
-      // 자녀 목록 새로고침
+      // 연결 후 상대방 정보 새로고침
       if (newUser.role === 'parent') {
         authAPI.getChild().then(data => { if (data.children) setChildren(data.children); }).catch(() => { });
+      } else {
+        authAPI.getParent().then(data => { if (data.parent) setParentInfo(data.parent); }).catch(() => { });
       }
     } catch (err) {
       setLinkStatus('error');
@@ -157,7 +161,14 @@ const ProfileSettings = () => {
 
   return (
     <div className="settings-container container animate-fade-in">
-      <h2 className="settings-title">프로필 설정</h2>
+      <div className="settings-header">
+        <h2 className="settings-title">프로필 설정</h2>
+        <button
+          className="settings-close-btn"
+          onClick={() => navigate(user?.role === 'parent' ? '/parent' : '/student')}
+          aria-label="닫기"
+        >✕</button>
+      </div>
 
       {/* 계정 정보 */}
       <section className="settings-card glass">

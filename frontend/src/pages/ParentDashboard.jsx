@@ -27,7 +27,8 @@ function formatDuration(sec) {
 const ParentDashboard = () => {
   const { user, updateUser } = useAuth();
 
-  const [childNames, setChildNames] = useState([]);
+  const [children, setChildren] = useState([]);
+  const [selectedChild, setSelectedChild] = useState(null); // null = 전체
   const [sessions, setSessions] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [linkCode, setLinkCode] = useState('');
@@ -40,11 +41,11 @@ const ParentDashboard = () => {
   const [ragError, setRagError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 자녀 이름 + 세션 목록 불러오기 (childStudentIds 변경 시 재조회)
+  // 자녀 정보 + 세션 목록 불러오기 (childStudentIds 변경 시 재조회)
   useEffect(() => {
-    if (!user?.childStudentIds?.length) { setSessions([]); setChildNames([]); return; }
+    if (!user?.childStudentIds?.length) { setSessions([]); setChildren([]); return; }
     authAPI.getChild()
-      .then(data => { if (data.children?.length) setChildNames(data.children.map(c => c.name)); })
+      .then(data => { if (data.children?.length) setChildren(data.children); })
       .catch(() => {});
     sessionAPI.getAll()
       .then(data => {
@@ -80,11 +81,27 @@ const ParentDashboard = () => {
       .finally(() => setRagLoading(false));
   }, [selectedSessionId]);
 
+  // 선택된 자녀 기준으로 세션 필터링
+  const filteredSessions = selectedChild
+    ? sessions.filter(s => s.studentId === selectedChild.studentId)
+    : sessions;
+
   const chartData = report?.chartData?.length > 0 ? report.chartData : MOCK_CHART;
   const avgFocus = report?.avgFocus ?? 82;
   const totalSec = report?.totalSec ?? 5400;
   const departureCount = report?.departureCount ?? 2;
   const tips = report?.tips ?? ['오늘 학습 세션이 순조롭게 진행되었습니다.'];
+
+  // 자녀 선택 변경 시 세션 초기화
+  const handleChildSelect = (child) => {
+    setSelectedChild(child);
+    setReport(null);
+    setRagText('');
+    const target = child
+      ? sessions.filter(s => s.studentId === child.studentId)
+      : sessions;
+    setSelectedSessionId(target.length > 0 ? target[0]._id : null);
+  };
 
   const handleLink = async (e) => {
     e.preventDefault();
@@ -114,7 +131,7 @@ const ParentDashboard = () => {
       <header className="dashboard-header">
         <h2>학습 대시보드</h2>
         <p className="subtitle">
-          {childNames.length > 0 ? `${childNames.join(', ')}의 학습 리포트` : user?.childStudentIds?.length ? '학습 리포트' : '자녀를 연결해주세요'}
+          {selectedChild ? `${selectedChild.name}의 학습 리포트` : children.length > 0 ? `전체 자녀 (${children.length}명)` : '자녀를 연결해주세요'}
           {loading && <span className="loading-tag"> · 불러오는 중...</span>}
         </p>
 
@@ -150,22 +167,42 @@ const ParentDashboard = () => {
           </form>
         )}
 
-        {sessions.length > 1 && (
+        {/* 자녀 선택 드롭다운 (다자녀일 때만 표시) */}
+        {children.length > 1 && (
+          <select
+            className="session-select"
+            value={selectedChild?.studentId ?? ''}
+            onChange={(e) => {
+              const child = children.find(c => c.studentId === e.target.value) ?? null;
+              handleChildSelect(child);
+            }}
+          >
+            <option value="">전체 자녀 ({children.length}명)</option>
+            {children.map(child => (
+              <option key={child.studentId} value={child.studentId}>
+                {child.name} ({child.gradeLevel === 'high' ? '고등' : '중등'})
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* 세션 선택 드롭다운 */}
+        {filteredSessions.length > 1 && (
           <select
             value={selectedSessionId || ''}
             onChange={(e) => setSelectedSessionId(e.target.value)}
-            style={{ marginTop: '0.5rem', background: 'var(--bg-color)', color: 'var(--text-main)', border: '1px solid var(--card-border)', borderRadius: '8px', padding: '0.4rem 0.8rem', cursor: 'pointer' }}
+            className="session-select"
           >
-            {sessions.map(s => (
+            {filteredSessions.map(s => (
               <option key={s._id} value={s._id}>
                 {s.subject || s.lectureId} — {formatDate(s.startTime)}
               </option>
             ))}
           </select>
         )}
-        {user?.childStudentIds?.length > 0 && sessions.length === 0 && !loading && (
+        {user?.childStudentIds?.length > 0 && filteredSessions.length === 0 && !loading && (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-            자녀의 세션이 없습니다. 학생 계정으로 세션을 시작해보세요.
+            {selectedChild ? `${selectedChild.name}의 세션이 없습니다.` : '자녀의 세션이 없습니다. 학생 계정으로 세션을 시작해보세요.'}
           </p>
         )}
       </header>

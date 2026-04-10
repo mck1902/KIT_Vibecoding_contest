@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate, Link, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './Login.css';
 
 const Register = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { register, user } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'student', gradeLevel: 'middle', partnerCode: '' });
+  const initialRole = location.state?.role || 'student';
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: initialRole, gradeLevel: 'middle', partnerCode: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 

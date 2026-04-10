@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import heroIllustration from '../assets/hero_illustration.png';
 import studentBanner from '../assets/student_card_banner.png';
 import parentBanner from '../assets/parent_card_banner.png';
@@ -11,6 +12,7 @@ import parentBanner from '../assets/parent_card_banner.png';
 */}
 
 const Landing = () => {
+    const navigate = useNavigate();
     return (
         <div className="min-h-screen font-sans bg-slate-50 relative overflow-x-hidden">
 
@@ -24,10 +26,10 @@ const Landing = () => {
                     <a href="#" className="hover:text-blue-600 transition-colors">About</a>
                 </nav>
                 <div className="flex gap-4">
-                    <button className="px-5 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                    <button onClick={() => navigate('/login')} className="px-5 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
                         Login
                     </button>
-                    <button className="px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors">
+                    <button onClick={() => navigate('/register')} className="px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors">
                         Sign Up
                     </button>
                 </div>
@@ -50,7 +52,7 @@ const Landing = () => {
                             실시간 집중도 추적, 맞춤형 학습 경로 및 데이터 기반 분석을 통해 자녀 또는 본인의 잠재력을 일깨우고 성장을 지원합니다.
                         </p>
                         <div className="mt-4">
-                            <button className="px-8 py-4 bg-[#1e3a8a] hover:bg-[#172554] text-white font-bold rounded-lg shadow-lg transition-all transform hover:-translate-y-1">
+                            <button onClick={() => navigate('/login')} className="px-8 py-4 bg-[#1e3a8a] hover:bg-[#172554] text-white font-bold rounded-lg shadow-lg transition-all transform hover:-translate-y-1">
                                 지금 시작하기
                             </button>
                         </div>
@@ -102,7 +104,7 @@ const Landing = () => {
                                 </li>
                             </ul>
                             <div className="mt-auto">
-                                <button className="w-full py-4 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold rounded-xl shadow-md transition-colors">
+                                <button onClick={() => navigate('/login')} className="w-full py-4 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold rounded-xl shadow-md transition-colors">
                                     학생 모드 탐색
                                 </button>
                             </div>
@@ -136,7 +138,7 @@ const Landing = () => {
                                 </li>
                             </ul>
                             <div className="mt-auto">
-                                <button className="w-full py-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white font-bold rounded-xl shadow-md transition-colors">
+                                <button onClick={() => navigate('/login')} className="w-full py-4 bg-[#1e3a8a] hover:bg-[#1e40af] text-white font-bold rounded-xl shadow-md transition-colors">
                                     학부모 모드 탐색
                                 </button>
                             </div>
