@@ -3,7 +3,7 @@
  * vite.config.js의 proxy 설정으로 /api → http://localhost:5000/api 포워딩됨
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL
+export const BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api';
 
