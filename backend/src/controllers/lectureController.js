@@ -1,5 +1,5 @@
 const Lecture = require('../models/Lecture');
-const { analyzeLectureContent } = require('../utils/claudeService');
+const { analyzeLectureContent } = require('../utils/aiService');
 
 // GET /api/lectures — 강좌 목록 조회
 async function getLectures(req, res) {
@@ -17,7 +17,7 @@ async function getLectures(req, res) {
   }
 }
 
-// POST /api/lectures/:id/analyze — 강좌 자막 분석 (Claude API)
+// POST /api/lectures/:id/analyze — 강좌 자막 분석 (AI API)
 async function analyzeLecture(req, res) {
   try {
     const { id } = req.params;

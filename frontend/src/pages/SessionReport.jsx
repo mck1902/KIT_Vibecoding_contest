@@ -1,7 +1,7 @@
 /* frontend/src/pages/SessionReport.jsx
  * 세션 종료 후 학생/학부모가 확인하는 학습 리포트 페이지
  * - 규칙 기반 리포트 (집중도 타임라인 + 통계 + 코칭 팁)
- * - Claude RAG 맞춤형 분석 (별도 로딩)
+ * - AI RAG 맞춤형 분석 (별도 로딩)
  */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -49,7 +49,7 @@ export default function SessionReport() {
       .catch((err) => setReportError(err.message))
       .finally(() => setReportLoading(false));
 
-    // RAG 분석 (Claude API — 응답이 더 느릴 수 있음)
+    // RAG 분석 (AI API — 응답이 더 느릴 수 있음)
     sessionAPI.getRagAnalysis(sessionId)
       .then((data) => setRagText(data.ragAnalysis))
       .catch((err) => setRagError(err.message))
@@ -203,17 +203,17 @@ export default function SessionReport() {
           )}
         </section>
 
-        {/* Claude RAG 맞춤형 분석 */}
+        {/* AI 맞춤형 분석 */}
         <section className="sr-rag-section glass">
           <div className="sr-rag-header">
-            <h3>Claude AI 맞춤형 분석</h3>
+            <h3>AI 맞춤형 분석</h3>
             <span className="sr-rag-badge">RAG</span>
           </div>
 
           {ragLoading && (
             <div className="sr-rag-loading">
               <div className="sr-spinner small" />
-              <p>Claude AI가 강의 내용과 집중도를 분석 중입니다...</p>
+              <p>AI가 강의 내용과 집중도를 분석 중입니다...</p>
             </div>
           )}
 

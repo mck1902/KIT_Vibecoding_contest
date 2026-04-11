@@ -82,7 +82,7 @@ export const sessionAPI = {
   getReport: (sessionId) =>
     request('GET', `/sessions/${sessionId}/report`),
 
-  /** Claude RAG 맞춤형 분석 조회 → { ragAnalysis: string } */
+  /** AI RAG 맞춤형 분석 조회 → { ragAnalysis: string } */
   getRagAnalysis: (sessionId) =>
     request('GET', `/sessions/${sessionId}/rag-analysis`),
 
@@ -102,7 +102,7 @@ export const lectureAPI = {
   /** 강좌 목록 조회 */
   getAll: () => request('GET', '/lectures'),
 
-  /** 강좌 자막 분석 트리거 (Claude API → segments 저장) */
+  /** 강좌 자막 분석 트리거 (AI API → segments 저장) */
   analyze: (lectureId) => request('POST', `/lectures/${lectureId}/analyze`, {}),
 };
 

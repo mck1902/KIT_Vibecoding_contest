@@ -12,7 +12,7 @@ const Features = () => {
     {
       icon: <FiFileText />,
       title: "RAG 기반 맞춤형 리포트",
-      desc: "Claude API가 강의 자막을 분석하고, 특정 구간의 집중도 저하 원인을 구체적으로 설명합니다."
+      desc: "AI가 강의 자막을 분석하고, 특정 구간의 집중도 저하 원인을 구체적으로 설명합니다."
     },
     {
       icon: <FiShield />,

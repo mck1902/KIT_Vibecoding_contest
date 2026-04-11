@@ -1,4 +1,4 @@
-/* 2026-04-09: 실 세션 데이터 + Claude RAG 리포트 연동 */
+/* 2026-04-09: 실 세션 데이터 + AI RAG 리포트 연동 */
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { sessionAPI, authAPI } from '../services/api';
@@ -258,13 +258,13 @@ const ParentDashboard = () => {
             }
           </div>
 
-          {/* Claude RAG 맞춤형 분석 */}
+          {/* AI 맞춤형 분석 */}
           <div className="report-card glass rag-coaching">
             <div className="card-header">
-              <span className="badge rag-badge">Claude RAG 맞춤형 분석</span>
+              <span className="badge rag-badge">AI 맞춤형 분석</span>
             </div>
             {ragLoading && (
-              <p className="rag-loading">Claude AI가 분석 중입니다...</p>
+              <p className="rag-loading">AI가 분석 중입니다...</p>
             )}
             {!ragLoading && ragText && <p>{ragText}</p>}
             {!ragLoading && !ragText && ragError && (

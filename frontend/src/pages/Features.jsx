@@ -24,7 +24,7 @@ const HeroSection = () => (
         <br />하나로 연결된 학습 플랫폼
       </h1>
       <p className="text-lg text-slate-400 max-w-2xl leading-relaxed break-keep">
-        온디바이스 비전 AI부터 Claude 기반 RAG 분석까지 —
+        온디바이스 비전 AI부터 AI 기반 RAG 분석까지 —
         EduWatch가 어떻게 집중력을 측정하고 학습을 개선하는지 살펴보세요.
       </p>
     </div>
@@ -46,10 +46,10 @@ const CORE_FEATURES = [
   },
   {
     icon: Sparkles,
-    title: 'Claude RAG 분석',
+    title: 'AI RAG 분석',
     subtitle: '강의 자막 + 집중도 데이터를 결합한 맞춤형 학습 인사이트',
     color: 'purple',
-    badge: 'Claude API',
+    badge: 'GPT-4o-mini',
     steps: ['강의 자막 세그먼트 분석', '집중도 타임라인과 매핑', '컨텍스트 기반 코칭 생성'],
     detail: '세션당 ~$0.02, 수학 문제풀이 구간 집중도 저하 등 구체적 원인 분석',
   },
@@ -209,7 +209,7 @@ const STUDENT_FEATURES = [
 const PARENT_FEATURES = [
   { icon: BarChart3, text: '상세 데이터 분석 대시보드' },
   { icon: TrendingUp, text: '장기 학습 진척도 모니터링' },
-  { icon: Sparkles,  text: 'Claude AI 인사이트 제공' },
+  { icon: Sparkles,  text: 'AI 인사이트 제공' },
   { icon: Bell,      text: '선제적 알림 & 실시간 업데이트' },
 ];
 

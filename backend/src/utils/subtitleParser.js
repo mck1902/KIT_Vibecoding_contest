@@ -4,7 +4,7 @@ const path = require('path');
 const SUBTITLES_DIR = path.join(__dirname, '../../data/subtitles');
 
 /**
- * SRT 파일을 파싱하여 타임스탬프 포함 텍스트 반환 (Claude API 입력용)
+ * SRT 파일을 파싱하여 타임스탬프 포함 텍스트 반환 (AI API 입력용)
  */
 function getSubtitleText(lectureId) {
   const filePath = path.join(SUBTITLES_DIR, `${lectureId}.srt`);

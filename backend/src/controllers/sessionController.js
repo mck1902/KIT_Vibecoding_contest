@@ -3,7 +3,7 @@ const Session = require('../models/Session');
 const Lecture = require('../models/Lecture');
 const Parent = require('../models/Parent');
 const { generateRuleBasedTips, buildChartData } = require('../utils/reportGenerator');
-const { generateRagReport } = require('../utils/claudeService');
+const { generateRagReport } = require('../utils/aiService');
 const STATUS_TO_FOCUS = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
 
 // JWT의 childStudentIds를 신뢰하지 않고 DB에서 현재 상태를 조회
@@ -157,7 +157,7 @@ async function getSessionReport(req, res) {
   }
 }
 
-// GET /api/sessions/:id/rag-analysis — Claude RAG 맞춤형 분석
+// GET /api/sessions/:id/rag-analysis — AI RAG 맞춤형 분석
 async function getRagAnalysis(req, res) {
   try {
     const { id } = req.params;
@@ -180,7 +180,7 @@ async function getRagAnalysis(req, res) {
     }
 
     const avgFocus = calcAvgFocus(session.records);
-    // 이미 생성된 분석이 있으면 캐시 반환 (Claude API 재호출 방지)
+    // 이미 생성된 분석이 있으면 캐시 반환 (AI API 재호출 방지)
     if (session.ragAnalysis) {
       return res.status(200).json({ ragAnalysis: session.ragAnalysis, cached: true });
     }
@@ -193,9 +193,9 @@ async function getRagAnalysis(req, res) {
         lecture.title
       );
     } catch (ragError) {
-      // Claude API 실패 시 규칙 기반 폴백 텍스트 반환
+      // AI API 실패 시 규칙 기반 폴백 텍스트 반환
       const tips = generateRuleBasedTips({ records: session.records, departures: session.departures, avgFocus });
-      ragText = `[Claude API 미연결 — 규칙 기반 분석]\n\n${tips.join('\n\n')}`;
+      ragText = `[AI API 미연결 — 규칙 기반 분석]\n\n${tips.join('\n\n')}`;
     }
 
     // 생성된 결과를 DB에 저장 (이후 재요청 시 API 미호출)
