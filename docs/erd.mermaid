@@ -1,0 +1,90 @@
+erDiagram
+    Student {
+        ObjectId _id PK "자동 생성"
+        String email UK "소문자 정규화"
+        String passwordHash "bcrypt 10-round"
+        String name "학생 이름"
+        String studentId UK "세션 연결용 고유 ID"
+        String gradeLevel "middle | high"
+        String inviteCode UK "6자리 초대 코드"
+        Date createdAt "자동"
+        Date updatedAt "자동"
+    }
+
+    Parent {
+        ObjectId _id PK "자동 생성"
+        String email UK "소문자 정규화"
+        String passwordHash "bcrypt 10-round"
+        String name "학부모 이름"
+        Array children "Student ObjectId 배열"
+        String inviteCode UK "6자리 초대 코드"
+        Date createdAt "자동"
+        Date updatedAt "자동"
+    }
+
+    Lecture {
+        ObjectId _id PK "자동 생성"
+        String lectureId UK "lec-001"
+        String title "미적분 기초"
+        String subject "수학"
+        String episode "에피소드"
+        String youtubeId "YouTube 영상 ID"
+        Number durationSec "강의 시간(초)"
+        String duration "표시용 문자열"
+        String color "카드 색상"
+        String subtitleText "SRT 자막 원본"
+        Array segments "Claude API 분석 결과"
+        Boolean analyzed "분석 완료 여부"
+        Date createdAt "자동"
+        Date updatedAt "자동"
+    }
+
+    Session {
+        ObjectId _id PK "자동 생성"
+        String studentId FK "Student.studentId 참조"
+        String lectureId FK "Lecture.lectureId 참조"
+        String subject "수학"
+        Date startTime "세션 시작"
+        Date endTime "세션 종료"
+        String ragAnalysis "Claude RAG 캐시"
+        Date createdAt "자동"
+        Date updatedAt "자동"
+    }
+
+    Record {
+        Date timestamp "기록 시각"
+        Number status "1~5 집중도 분류"
+        Number confidence "0~1 신뢰도"
+    }
+
+    Departure {
+        Date leaveTime "이탈 시각"
+        Date returnTime "복귀 시각"
+        Number duration "이탈 시간 ms"
+    }
+
+    Quiz {
+        ObjectId _id PK "자동 생성"
+        String sessionId FK "세션 ID"
+        String lectureId FK "강좌 ID"
+        Array questions "퀴즈 문제 배열"
+        Number score "정답 수"
+        Number total "총 문제 수"
+        Date completedAt "풀이 완료 시각"
+        Date generatedAt "생성 시각"
+    }
+
+    Question {
+        String question "문제 텍스트"
+        Array options "선택지 4개"
+        Number answer "정답 인덱스"
+        String explanation "해설"
+    }
+
+    Student ||--o{ Session : "학생이 수강"
+    Parent ||--o{ Student : "자녀 관리 (children 배열)"
+    Lecture ||--o{ Session : "강좌별 세션"
+    Session ||--o{ Record : "집중도 기록 (내장, 3초마다)"
+    Session ||--o{ Departure : "탭 이탈 기록 (내장)"
+    Session ||--o| Quiz : "복습 퀴즈 (미구현)"
+    Quiz ||--o{ Question : "퀴즈 문제 (내장)"

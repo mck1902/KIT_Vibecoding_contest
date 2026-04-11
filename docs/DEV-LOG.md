@@ -1,6 +1,15 @@
 # EduWatch 개발 작업 내역
 
-> 작성일: 2026-04-09 | 공모전 마감: 2026-04-13
+> 최종 수정: 2026-04-10 | 공모전 마감: 2026-04-13
+
+---
+
+> **[이번 세션 수정 요약]**
+> - develop 브랜치 병합 (Student/Parent 분리 모델 충돌 해결)
+> - 랜딩 페이지 버튼 라우팅 연결
+> - 모의 탭 이탈 버튼 제거
+> - P1 버그 3건 수정 (학부모 중복 연결 / TF.js 인터벌 중복 / 가짜 데이터)
+> - 시드 데이터 타임스탬프 버그 수정
 
 ---
 
@@ -8,18 +17,389 @@
 
 | 항목 | 상태 |
 |------|------|
-| 프론트엔드 UI | ✅ 완료 (4페이지 + 공통 컴포넌트) |
+| 프론트엔드 UI | ✅ 완료 (6페이지 + 공통 컴포넌트) |
 | YouTube 강의 영상 연동 | ✅ 완료 (EBS 3개) |
 | 백엔드 세션 API | ✅ 완료 (CRUD + 기록/이탈/종료) |
 | Claude API 자막 분석 | ✅ 완료 |
 | Claude RAG 맞춤형 리포트 | ✅ 완료 |
 | 프론트-백엔드 실데이터 연결 | ✅ 완료 |
-| TF.js 웹캠 연동 | ❌ 미구현 |
+| JWT 인증 시스템 (로그인/회원가입) | ✅ 완료 |
+| 회원 정보 수정 (초대코드/이름/비밀번호) | ✅ 완료 |
+| Student/Parent 분리 모델 + 다자녀 지원 | ✅ 완료 |
+| 초대 코드 연결 버그 수정 (4건) | ✅ 완료 |
+| 학부모 대시보드 자녀 선택 필터 | ✅ 완료 |
+| TF.js 웹캠 연동 | ✅ 완료 (인터벌 중복 버그 수정 포함) |
 | 배포 (Vercel + Render) | ❌ 미구현 |
 
 ---
 
 ## 작업 내역 (날짜순)
+
+### 2026-04-10 (7) | develop 브랜치 병합 + 버그 수정 (P1 3건 + 시드 타임스탬프)
+
+#### develop 브랜치 병합 — Student/Parent 분리 모델 충돌 해결
+
+`feat/khh` ← `develop` 머지. 충돌 파일 3개 수동 해결:
+
+| 파일 | 해결 방향 |
+|------|-----------|
+| `backend/src/controllers/authController.js` | develop의 Student/Parent 구조 채택 + HEAD의 기능(`getChild`, `getParent`, `unlink`, `updateProfile`, lazy inviteCode) 적응 |
+| `backend/src/scripts/seed.js` | develop 버전(Student/Parent 모델 기반)으로 교체 |
+| `frontend/src/pages/ParentDashboard.jsx` | HEAD 버전(`childStudentIds`, `authAPI.getChild()`, `childNames`) 유지 |
+
+`backend/src/models/User.js` — develop에서 삭제됨, HEAD에서 `git rm`으로 제거.
+
+---
+
+#### 랜딩 페이지 버튼 라우팅 연결 (`frontend/src/pages/Landing.jsx`)
+
+`useNavigate` 추가, 5개 버튼에 경로 연결:
+
+| 버튼 | 경로 |
+|------|------|
+| Login (헤더) | `/login` |
+| Sign Up (헤더) | `/register` |
+| 지금 시작하기 | `/login` |
+| 학생 모드 탐색 | `/login` |
+| 학부모 모드 탐색 | `/login` |
+
+`Register.jsx` — `useLocation`으로 `state.role` 수신, 초기 역할 자동 선택 지원 (현재 미사용, 추후 활용 가능).
+
+---
+
+#### 모의 탭 이탈 버튼 제거 (`frontend/src/pages/StudentDashboard.jsx`)
+
+- `triggerMockDeparture` 함수 삭제
+- 하단 컨트롤 바에서 "모의 탭 이탈" 버튼 제거
+
+---
+
+#### P1 버그 수정 3건
+
+**① 학부모 중복 연결 차단 (`backend/src/controllers/authController.js`)**
+
+학부모가 학생 초대 코드 입력 시, 해당 학생이 이미 다른 학부모와 연결된 경우를 차단하지 않던 문제.
+
+```js
+// 수정 전: 중복 체크 없음
+await Parent.findByIdAndUpdate(caller._id, { $addToSet: { children: partner._id } });
+
+// 수정 후
+const existingParent = await Parent.findOne({ children: partner._id });
+if (existingParent) {
+  return { linked: false, message: '해당 학생은 이미 다른 학부모와 연결되어 있습니다.' };
+}
+```
+
+학생 쪽(`BUG-03`)은 기존에 차단됨. 학부모 쪽도 동일하게 1:1 관계 강제.
+
+**② TF.js 분석 인터벌 중복 실행 방지 (`frontend/src/hooks/useAttentionAnalysis.js`)**
+
+`startAnalysis()` 호출 시 기존 `intervalRef.current`를 정리하지 않아 중복 인터벌 생성, 추론 2배 실행 + 메모리 누수 발생.
+
+```js
+// 수정: 진입 시 기존 인터벌 먼저 정리
+if (intervalRef.current) {
+  clearInterval(intervalRef.current);
+  intervalRef.current = null;
+}
+```
+
+**③ 학부모 대시보드 가짜 데이터 제거 (`frontend/src/pages/ParentDashboard.jsx`)**
+
+세션이 없을 때 `avgFocus: 82`, `totalSec: 5400`, `departureCount: 2` 같은 하드코딩 수치와 `MOCK_CHART`를 표시하던 문제.
+
+- `MOCK_CHART` 상수 삭제
+- `?? 82`, `?? 5400`, `?? 2` 폴백 제거
+- `hasReport = !!report` 플래그 기반으로 렌더링 분기
+  - 데이터 없음 시: 수치 카드 `—`, 차트 안내 문구, AI 코칭 "세션 데이터가 없습니다."
+
+---
+
+#### 시드 데이터 타임스탬프 버그 수정 (`backend/scripts/seedDemo.js`)
+
+`generateRecords()`가 `startTime`을 `'2026-04-09T14:00:00Z'`로 하드코딩. 루프에서 `sessionStart`는 2시간씩 증가하므로 2번째/3번째 세션의 records·departures 타임스탬프가 세션 시작 시각보다 2~4시간 앞서는 문제.
+
+```js
+// 수정 전
+function generateRecords(durationMin) {
+  const startTime = new Date('2026-04-09T14:00:00.000Z'); // 하드코딩
+
+// 수정 후
+function generateRecords(durationMin, startTime) {
+  // 호출부: generateRecords(lec.durationMin, sessionStart)
+```
+
+`generateDepartures(startTime)` → `generateDepartures(sessionStart)` 동일하게 수정.
+
+---
+
+### 2026-04-10 (6) | 학부모 대시보드 UX 개선 — 자녀 선택 필터 + ProfileSettings 닫기 버튼
+
+#### 학부모 대시보드 자녀 선택 드롭다운 (`frontend/src/pages/ParentDashboard.jsx`)
+
+다자녀 환경에서 특정 자녀의 세션만 필터링하여 조회할 수 있도록 추가.
+
+- `selectedChild` state 추가 (null = 전체)
+- `filteredSessions` — `selectedChild`가 있으면 `sessions.filter(s => s.studentId === selectedChild.studentId)`, 없으면 전체
+- `handleChildSelect(child)` — 자녀 변경 시 `report`, `ragText` 초기화 후 해당 자녀의 첫 세션 자동 선택
+- 자녀가 2명 이상일 때만 `<select>` 드롭다운 표시 (1명이면 생략)
+  - "전체 자녀 (N명)" 옵션이 기본값
+  - 각 옵션: `{이름} ({고등|중등})` 형식
+- 세션 드롭다운도 `filteredSessions` 기준으로 변경
+- 헤더 subtitle: 선택된 자녀 이름 / "전체 자녀 (N명)" / "자녀를 연결해주세요" 동적 표시
+
+**CSS 추가 (`frontend/src/pages/ParentDashboard.css`)**
+
+`.session-select` — 자녀/세션 공통 드롭다운 스타일 (둥근 테두리, primary focus, 최대 360px)
+
+#### ProfileSettings 닫기 버튼 (`frontend/src/pages/ProfileSettings.jsx`)
+
+- 헤더 우측에 `✕` 버튼 추가
+- 학부모: `/parent` / 학생: `/student` 로 `navigate()` 이동
+- `.settings-close-btn` CSS: 원형, hover 시 배경색 전환
+
+---
+
+### 2026-04-10 (5) | Student/Parent 분리 모델 + 초대 코드 연결 버그 수정
+
+#### 모델 분리 (`backend/src/models/`)
+
+단일 `User.js` → 역할별 별도 모델로 완전 분리. 계획: `docs/LINK-BUG-FIX-PLAN.md` 참고.
+
+| 파일 | 역할 | 핵심 필드 |
+|------|------|---------|
+| `Student.js` | 학생 계정 | `email`, `passwordHash`, `name`, `studentId`, `gradeLevel`, `inviteCode` |
+| `Parent.js` | 학부모 계정 | `email`, `passwordHash`, `name`, `children: [ObjectId ref 'Student']`, `inviteCode` |
+
+- `role` 필드: `default`로 고정, `immutable: true` 설정 (변경 불가)
+- 학부모의 자녀 목록은 `ObjectId` 참조 배열 (`$addToSet` / `$pull` 운용)
+
+#### authController 전체 재작성 (`backend/src/controllers/authController.js`)
+
+**`buildUserPayload(user)`**
+- 학부모인 경우 `Parent.findById().populate('children')` 재조회
+- `childStudentIds: children.map(c => c.studentId)` — 문자열 배열로 JWT에 포함
+- sessionController의 `$in` 필터가 이 배열을 사용
+
+**`register`**
+- `Student` / `Parent` 모델 분기 생성
+- `partnerCode` 입력 시 `linkByCode()` 즉시 호출
+
+**`linkByCode(caller, partnerCode)`**
+- Student/Parent 두 컬렉션 모두 조회해 초대 코드 소유자 확인
+- BUG-01 수정 (학부모 중복 연결 차단):
+  ```js
+  const alreadyLinked = caller.children.some(c => c.equals(partner._id));
+  if (alreadyLinked) return { linked: false, message: '이미 연결된 자녀입니다.' };
+  ```
+- BUG-03 수정 (학생 다중 학부모 연결 차단):
+  ```js
+  const existingParent = await Parent.findOne({ children: caller._id });
+  if (existingParent) return { linked: false, message: '이미 연결된 학부모가 있습니다. 먼저 연결을 해제해주세요.' };
+  ```
+
+**`unlink`**
+- 학생: `Parent.updateMany({ children: student._id }, { $pull: { children: student._id } })`
+- 학부모: `?studentId=` 쿼리 파라미터로 특정 자녀만 해제, 없으면 전체 해제
+
+**`getChild`** — `Parent.findById().populate('children')` → `{ children: [...] }` 배열 반환
+
+**`getParent`** — `Parent.findOne({ children: student._id })` → 학생에게 연결된 학부모 반환
+
+#### sessionController 반영 (`backend/src/controllers/sessionController.js`)
+
+- `hasSessionAccess`: 부모 → `user.childStudentIds.includes(session.studentId)` 배열 체크
+- `getSessions`: 부모 필터 → `{ studentId: { $in: childStudentIds } }` (전체 자녀 세션 통합 조회)
+
+#### 프론트엔드 반영
+
+**`frontend/src/services/api.js`**
+- `getChild()` → `{ children: [] }` 배열 응답 처리
+- `unlink(studentId?)` → `?studentId=` 쿼리 파라미터 지원
+
+**`frontend/src/pages/ProfileSettings.jsx`**
+- `childInfo` → `children[]` 배열 state로 전환
+- "연결된 자녀" 섹션: 자녀 목록 + 각 자녀별 개별 "연결 해제" 버튼
+- `handleUnlink(studentId?)` — 특정 자녀 studentId 전달로 개별 해제
+- BUG-02 수정: `handleLink` 완료 후 학생 역할이면 `authAPI.getParent()` 재조회 → `setParentInfo` 즉시 반영
+
+**`frontend/src/pages/ParentDashboard.jsx`**
+- `children[]` 배열 state로 전환 (이름, gradeLevel, studentId 포함)
+- 자녀 연결 폼: 항상 표시 (다자녀 추가 연결 허용)
+
+> **⚠️ DB 초기화 필요**: 기존 `User` 컬렉션은 사용하지 않음. `npm run seed`로 데모 계정 재생성 필요.
+
+---
+
+### 2026-04-10 (4) | 보안 강화 — CORS 제한 / 레이트 리밋 / 입력값 검증
+
+#### CORS 설정 강화 (`backend/src/index.js`)
+
+- `app.use(cors())` 전면 허용 → origin/methods/allowedHeaders 명시적 제한
+- `ALLOWED_ORIGINS` 환경변수로 개발/운영 분리 (기본값: `http://localhost:5173`)
+- `methods`: GET, POST, PUT, PATCH, DELETE
+- `allowedHeaders`: Content-Type, Authorization
+
+#### 레이트 리밋 (`express-rate-limit`, `backend/src/routes/auth.js`)
+
+| 엔드포인트 | 제한 |
+|-----------|------|
+| `POST /api/auth/login` | IP당 15분에 20회 |
+| `POST /api/auth/register` | IP당 1시간에 10회 |
+| `PUT /api/auth/link`, `PATCH /api/auth/profile` | IP당 15분에 30회 |
+
+초과 시 `429 Too Many Requests` + 한국어 메시지 반환.
+
+#### 입력값 검증 (`zod`, `backend/src/middleware/validate.js`)
+
+`validate(schema)` 미들웨어 팩토리 생성. 검증 실패 시 컨트롤러 진입 전 `400` 차단.
+
+| 엔드포인트 | 검증 항목 |
+|-----------|---------|
+| `POST /register` | email 형식, password 6자+, role enum, student → gradeLevel 필수 |
+| `POST /login` | email 형식, password 존재 |
+| `PUT /link` | partnerCode 존재 |
+| `PATCH /profile` | 변경 항목 존재, 비밀번호 변경 시 currentPassword 필수 |
+| `POST /sessions` | lectureId 필수 |
+| `POST /sessions/:id/records` | timestamp ISO 형식, status 1~5, confidence 0~1 |
+| `POST /sessions/:id/departures` | leaveTime/returnTime ISO 형식, duration 0+ |
+
+---
+
+### 2026-04-10 (3) | 다자녀 지원 스키마 마이그레이션
+
+#### User 모델 변경 (`backend/src/models/User.js`)
+
+| 변경 전 | 변경 후 | 이유 |
+|---------|---------|------|
+| `childStudentId: String` | `childStudentIds: [String]` | 학부모 1명이 여러 자녀를 모니터링 |
+
+#### authController 전체 반영 (`backend/src/controllers/authController.js`)
+
+- `generateToken`, `userPayload` — `childStudentIds` 배열로 교체
+- `linkByCode` — `$push: { childStudentIds }` (중복 방지 포함)
+- `link` — 학생/학부모 모두 `$push` + 중복 시 409 반환
+- `getChild` — 단일 객체 → `{ children: [...] }` 배열 반환 (`User.find({ studentId: { $in: [...] } })`)
+- `getParent` — `childStudentIds: student.studentId` 조건으로 학부모 조회
+- `unlink`
+  - 학생: `User.updateMany({ childStudentIds: studentId }, $pull)` — 연결된 모든 학부모에서 제거
+  - 학부모: `?studentId=` 쿼리 파라미터로 특정 자녀만 제거, 없으면 전체 해제
+
+#### sessionController 반영 (`backend/src/controllers/sessionController.js`)
+
+- `hasSessionAccess` — 부모 역할 시 `childStudentIds.includes(session.studentId)` 배열 체크로 변경
+- `getSessions` — 부모 필터: `{ studentId: { $in: childStudentIds } }` (전체 자녀 세션 조회)
+
+#### 시드 스크립트 업데이트 (`backend/src/scripts/seed.js`)
+
+- 데모 학부모 계정: `childStudentIds: [DEMO_STUDENT_ID]` 배열로 변경
+
+#### 프론트엔드 반영
+
+**`frontend/src/services/api.js`**
+- `getChild()` 응답 형식: `{ child }` → `{ children: [] }`
+- `unlink(studentId?)` — 학부모가 특정 자녀만 해제 시 `?studentId=` 쿼리 파라미터 전달
+
+**`frontend/src/pages/ParentDashboard.jsx`**
+- `childName` → `childNames[]` 배열, `getChild()` 응답의 `children` 매핑
+- 헤더 subtitle: 여러 자녀 이름 쉼표로 나열 (`"김학생, 이학생의 학습 리포트"`)
+- 자녀 연결 폼: 항상 표시 (다자녀 추가 허용)
+- `user?.childStudentId` → `user?.childStudentIds?.length` 조건 전환
+
+**`frontend/src/pages/ProfileSettings.jsx`**
+- `childInfo` → `children[]` 배열
+- "연결된 자녀" 섹션: 자녀 목록 렌더링 + 각 자녀별 개별 "연결 해제" 버튼
+- `handleUnlink(studentId?)` — 특정 자녀 studentId 전달로 개별 해제
+- `isLinked`: `user?.childStudentIds?.length > 0` 조건으로 변경
+- 학부모 연결 현황 문구: "자녀 N명과 연결되어 있습니다. 추가 연결도 가능합니다."
+
+> **⚠️ DB 마이그레이션 필요**: 기존 MongoDB에 `childStudentId` 필드로 저장된 데이터는 `childStudentIds` 배열로 수동 이전 또는 `npm run seed` 재실행 필요.
+
+---
+
+### 2026-04-10 (2) | 연결 해제 기능 + 비밀번호 버그 수정
+
+#### 학생 → 학부모 연결 해제
+
+**Backend 추가**
+- `GET /api/auth/parent` — 학생 `studentId`로 연결된 학부모 조회 (`name`, `inviteCode` 반환)
+- `DELETE /api/auth/link` — 연결 해제
+  - 학생: 학부모의 `childStudentId` null 처리
+  - 학부모: 본인 `childStudentId` null 처리 + 새 토큰 발급
+
+**Frontend 추가**
+- `authAPI.getParent()`, `authAPI.unlink()` 추가 (`services/api.js`)
+- `ProfileSettings.jsx` — 학생 마운트 시 학부모 정보 조회
+  - 연결됨: 학부모 이름 + 초대 코드 표시, 입력 칸 비활성화
+  - "연결 해제" 버튼 → 인라인 확인 UI 전환 (`window.confirm` 미사용)
+  - [취소] / [해제] 버튼으로 처리, 완료 후 상태 초기화
+
+#### 비밀번호 변경 버그 수정
+
+**원인**: `PATCH /api/auth/profile`에서 현재 비밀번호 불일치 시 `401` 반환
+→ `api.js`의 `request()`가 401을 토큰 만료로 오인해 로그아웃 + `/login` 리다이렉트
+
+**수정 1 — Backend** (`authController.js`)
+- 현재 비밀번호 불일치 응답: `401` → `400` 변경
+- `401`은 토큰 무효/만료에만 사용하도록 의미 분리
+
+**수정 2 — Frontend** (`api.js`)
+- 기존: 401 응답이면 무조건 로그아웃
+- 변경: `err.message === '유효하지 않은 토큰입니다.'`일 때만 로그아웃 처리
+- 비밀번호 불일치 등 일반 오류는 에러 메시지만 표시
+
+---
+
+### 2026-04-10 | Day 5: 인증 시스템 + 회원 정보 수정
+
+#### 인증 시스템 (JWT)
+
+**Backend 신규**
+- `backend/src/models/User.js` — User 스키마 (email, passwordHash, role, name, studentId, childStudentId, gradeLevel, inviteCode)
+- `backend/src/middleware/auth.js` — `requireAuth` (JWT 검증), `requireRole`
+- `backend/src/controllers/authController.js` — register / login / me / link / updateProfile / getChild
+- `backend/src/routes/auth.js` — `/api/auth/*` 라우트 전체
+- `backend/src/scripts/seed.js` — 데모 계정 2개 (student@demo.com / parent@demo.com)
+
+**Auth API 엔드포인트**
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/api/auth/register` | 회원가입 (inviteCode 자동 발급, partnerCode 연결 옵션) |
+| POST | `/api/auth/login` | 로그인 → JWT 발급 |
+| GET | `/api/auth/me` | 내 정보 조회 (inviteCode null이면 자동 발급) |
+| PUT | `/api/auth/link` | 초대 코드로 학생↔학부모 연결 |
+| PATCH | `/api/auth/profile` | 이름·비밀번호 변경 |
+| GET | `/api/auth/child` | 연결된 자녀 정보 조회 (학부모 전용) |
+
+**Frontend 신규/수정**
+- `frontend/src/contexts/AuthContext.jsx` — user/token 전역 관리, login/register/logout/updateUser
+- `frontend/src/components/common/ProtectedRoute.jsx` — role 기반 보호 라우트
+- `frontend/src/pages/Login.jsx` — 이메일+비밀번호 로그인 폼
+- `frontend/src/pages/Register.jsx` — 역할 선택, 학교급, 초대 코드 입력 포함 회원가입
+- `frontend/src/pages/ProfileSettings.jsx` — 계정 정보 / 자녀 정보 / 초대 코드 / 이름 변경 / 비밀번호 변경
+- `frontend/src/components/common/NavBar.jsx` — 로그인 상태 반영, ⚙ 설정 아이콘 추가
+- `frontend/src/App.jsx` — 보호 라우트 적용, `/settings` 추가
+
+#### StudentDashboard sessionAPI 연동
+
+- raw `fetch()` 5곳 → `sessionAPI.*` 서비스 호출로 교체
+- `useAuth`로 로그인 사용자 연동
+- 사이드바에 초대 코드 카드 추가 (`user?.inviteCode`)
+
+#### ParentDashboard 자녀 이름 표시
+
+- `authAPI.getChild()` 호출로 자녀 이름 조회
+- subtitle: `${childName}의 학습 리포트` (미연결 시 "자녀를 연결해주세요")
+
+#### 버그 수정 / 환경 설정
+
+- 백엔드 포트 5000 → **5001** 변경 (`backend/.env`, Vite proxy 정합)
+- `GET /api/auth/me`에서 inviteCode 없는 기존 계정 자동 발급 (lazy migration)
+- 비밀번호 변경 성공 시 성공 화면 전환 후 [확인] 버튼으로만 폼 초기화
+
+---
 
 ### 2026-04-06 ~ 07 | Day 1–2: 기반 구축
 
@@ -344,19 +724,19 @@ POST /api/lectures/:id/analyze
 - [x] `services/api.js` 작성 — 백엔드 API 호출 함수 전체 ✅
 - [x] `StudentDashboard` → 세션 시작/종료/기록/이탈 API 연동 ✅
 - [x] `SessionReport.jsx` 신규 구현 (리포트 + RAG 결과 표시) ✅
+- [x] JWT 인증 시스템 구현 (로그인/회원가입/보호 라우트) ✅
+- [x] 회원 정보 수정 페이지 (초대코드/이름/비밀번호) ✅
 - [ ] `ANTHROPIC_API_KEY` 설정 후 3개 강좌 자막 분석 실행
   ```bash
-  curl -X POST http://localhost:5000/api/lectures/lec-001/analyze
-  curl -X POST http://localhost:5000/api/lectures/lec-002/analyze
-  curl -X POST http://localhost:5000/api/lectures/lec-003/analyze
+  curl -X POST http://localhost:5001/api/lectures/lec-001/analyze
+  curl -X POST http://localhost:5001/api/lectures/lec-002/analyze
+  curl -X POST http://localhost:5001/api/lectures/lec-003/analyze
   ```
 - [ ] 전체 데모 흐름 E2E 테스트 (강의 시작 → 세션 종료 → 리포트 → RAG 확인)
 
 ### 🟡 있으면 좋음
 
-- [ ] `ParentDashboard` 실데이터 연동 (`GET /api/sessions?studentId=demo-student-001`)
-- [ ] TensorFlow.js 웹캠 연동 (`@tensorflow/tfjs`, `@tensorflow-models/face-landmarks-detection`)
-- [ ] 실제 MobileNet V3 집중도 분류 (시뮬레이션 대체)
+- [ ] TensorFlow.js 웹캠 + 실제 MobileNet V3 집중도 분류 연동
 - [ ] 학부모 주간 리포트 API (`GET /api/students/:id/weekly`)
 
 ### 🟢 배포 (4/12)

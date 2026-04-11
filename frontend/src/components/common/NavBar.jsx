@@ -1,10 +1,19 @@
-/* 2026-04-08 수정: 라우팅 목적으로 react-router-dom 의 Link를 사용하도록 수정했습니다. */
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { FiSun, FiMoon } from 'react-icons/fi';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { FiSun, FiMoon, FiLogOut, FiSettings } from 'react-icons/fi';
+import { useAuth } from '../../contexts/AuthContext';
 import './NavBar.css';
 
 const NavBar = ({ theme, toggleTheme }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <nav className="navbar glass">
       <div className="container nav-content">
@@ -12,15 +21,37 @@ const NavBar = ({ theme, toggleTheme }) => {
           <span className="logo-accent">Edu</span>Watch
         </Link>
         <ul className="nav-links">
-          <li><Link to="/">기능소개</Link></li>
-          <li><Link to="/parent">학부모 로그인</Link></li>
-          <li><Link to="/student">학생 강의실</Link></li>
+          <li><Link to="/features">기능소개</Link></li>
+          {user?.role === 'parent' && <li><Link to="/parent">대시보드</Link></li>}
+          {user?.role === 'student' && <li><Link to="/student">강의실</Link></li>}
+          {!user && (
+            <>
+              <li><Link to="/parent">학부모</Link></li>
+              <li><Link to="/student">학생</Link></li>
+            </>
+          )}
         </ul>
         <div className="nav-actions">
           <button className="theme-toggle" onClick={toggleTheme}>
             {theme === 'light' ? <FiMoon size={20} /> : <FiSun size={20} />}
           </button>
-          <Link to="/login" className="btn-primary" style={{ padding: '0.5rem 1.2rem', borderRadius: '8px' }}>로그인</Link>
+          {user ? (
+            <div className="nav-user">
+              <span className="nav-username">{user.name}</span>
+              <Link
+                to="/settings"
+                className={`btn-settings${location.pathname === '/settings' ? ' active' : ''}`}
+                title="설정"
+              >
+                <FiSettings size={18} />
+              </Link>
+              <button className="btn-logout" onClick={handleLogout} title="로그아웃">
+                <FiLogOut size={18} />
+              </button>
+            </div>
+          ) : (
+            <Link to="/login" className="btn-primary" style={{ padding: '0.5rem 1.2rem', borderRadius: '8px' }}>로그인</Link>
+          )}
         </div>
       </div>
     </nav>

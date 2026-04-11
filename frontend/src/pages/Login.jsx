@@ -1,16 +1,32 @@
-/* 2026-04-08 생성: 학부모와 학생 로그인을 목업으로 제공하는 페이지입니다. */
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './Login.css';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login, user } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (role) => {
-    if (role === 'parent') {
-      navigate('/parent');
-    } else {
-      navigate('/student');
+  // 이미 로그인 상태면 대시보드로 이동
+  if (user) {
+    return <Navigate to={user.role === 'student' ? '/student' : '/parent'} replace />;
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const loggedUser = await login(email, password);
+      navigate(loggedUser.role === 'student' ? '/student' : '/parent', { replace: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -18,24 +34,48 @@ const Login = () => {
     <div className="login-container container">
       <div className="login-box glass animate-fade-in">
         <h2 className="login-title">EduWatch 로그인</h2>
-        <p className="login-subtitle">로그인할 계정 유형을 선택해주세요.</p>
-        
-        <div className="login-options">
-          <button className="role-btn" onClick={() => handleLogin('student')}>
-            <span className="emoji">📝</span>
-            <div className="role-text">
-              <h3>학생 로그인</h3>
-              <p>인강 시청 및 태도 분석</p>
-            </div>
-          </button>
+        <p className="login-subtitle">이메일과 비밀번호로 로그인하세요.</p>
 
-          <button className="role-btn parent-btn" onClick={() => handleLogin('parent')}>
-            <span className="emoji">👨‍👩‍👦</span>
-            <div className="role-text">
-              <h3>학부모 로그인</h3>
-              <p>자녀 학습 리포트 및 대시보드</p>
-            </div>
+        <form className="login-form" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="email">이메일</label>
+            <input
+              id="email"
+              type="email"
+              className="form-input"
+              placeholder="example@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="password">비밀번호</label>
+            <input
+              id="password"
+              type="password"
+              className="form-input"
+              placeholder="비밀번호 입력"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          {error && <p className="form-error">{error}</p>}
+
+          <button type="submit" className="submit-btn" disabled={loading}>
+            {loading ? '로그인 중...' : '로그인'}
           </button>
+        </form>
+
+        <div className="login-footer">
+          <p>계정이 없으신가요? <Link to="/register" className="link">회원가입</Link></p>
+          <p className="demo-hint">
+            데모 계정: <code>student@demo.com</code> / <code>password123</code>
+          </p>
         </div>
       </div>
     </div>

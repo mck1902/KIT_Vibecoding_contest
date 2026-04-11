@@ -133,6 +133,11 @@ export default function useAttentionAnalysis(captureFrame, isWebcamActive) {
   // 분석 시작/중지
   const startAnalysis = useCallback(() => {
     if (!isModelLoaded) return;
+    // 기존 인터벌 먼저 정리 (중복 실행 방지)
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     analysisActiveRef.current = true;
     setIsAnalyzing(true);
     noFaceCountRef.current = 0;

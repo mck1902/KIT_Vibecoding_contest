@@ -1,5 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap');
 
+/* 
+ * 수정 일자: 2026-04-10
+ * 수정 내용: TailwindCSS v3 설정 방식에 맞게 @import "tailwindcss"를 @tailwind 디렉티브 3개(base, components, utilities)로 변경하여 postcss-import 파싱 에러(Unknown word "use strict")를 해결함.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   /* 라이트 모드 (Light Theme) 변수 */
   --bg-color: #f8fafc;
@@ -12,6 +20,7 @@
   --header-bg: rgba(248, 250, 252, 0.8);
   --btn-text: #ffffff;
   --accent-color: #8b5cf6;
+  --input-bg: #ffffff;
 }
 
 [data-theme='dark'] {
@@ -26,6 +35,7 @@
   --header-bg: rgba(11, 15, 25, 0.8);
   --btn-text: #ffffff;
   --accent-color: #a78bfa;
+  --input-bg: #1e2535;
 }
 
 * {
