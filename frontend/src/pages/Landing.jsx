@@ -16,28 +16,9 @@ const Landing = () => {
     return (
         <div className="min-h-screen font-sans bg-slate-50 relative overflow-x-hidden">
 
-            {/* Header Navigation */}
-            <header className="fixed top-0 left-0 w-full bg-white shadow-sm z-50 px-6 py-4 flex justify-between items-center">
-                <div className="text-2xl font-bold text-slate-900 tracking-tight">EduWatch</div>
-                <nav className="hidden md:flex gap-8 text-sm font-semibold text-slate-600">
-                    <a href="#" className="hover:text-blue-600 transition-colors">Features</a>
-                    <a href="#" className="hover:text-blue-600 transition-colors">Solutions</a>
-                    <a href="#" className="hover:text-blue-600 transition-colors">Pricing</a>
-                    <a href="#" className="hover:text-blue-600 transition-colors">About</a>
-                </nav>
-                <div className="flex gap-4">
-                    <button onClick={() => navigate('/login')} className="px-5 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
-                        Login
-                    </button>
-                    <button onClick={() => navigate('/register')} className="px-5 py-2 text-sm font-semibold text-white bg-blue-700 rounded-lg hover:bg-blue-800 transition-colors">
-                        Sign Up
-                    </button>
-                </div>
-            </header>
-
             {/* Hero Section (Gradient Background) */}
             {/* Background gradient from dark blue to purple, simulating the reference image */}
-            <section className="pt-32 pb-48 px-6 bg-gradient-to-r from-[#0f172a] via-[#1e40af] to-[#c084fc] relative z-0">
+            <section className="pt-8 pb-48 px-6 bg-gradient-to-r from-[#0f172a] via-[#1e40af] to-[#c084fc] relative z-0">
                 <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12">
                     <div className="md:w-1/2 flex flex-col gap-6 text-white text-left">
                         <h1 className="font-extrabold leading-[1.2] tracking-tight flex flex-col gap-2">
