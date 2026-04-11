@@ -1,15 +1,140 @@
 # EduWatch 개발 작업 내역
 
-> 최종 수정: 2026-04-10 | 공모전 마감: 2026-04-13
+> 최종 수정: 2026-04-11 | 공모전 마감: 2026-04-13
 
 ---
 
 > **[이번 세션 수정 요약]**
-> - develop 브랜치 병합 (Student/Parent 분리 모델 충돌 해결)
-> - 랜딩 페이지 버튼 라우팅 연결
-> - 모의 탭 이탈 버튼 제거
-> - P1 버그 3건 수정 (학부모 중복 연결 / TF.js 인터벌 중복 / 가짜 데이터)
-> - 시드 데이터 타임스탬프 버그 수정
+> - develop 브랜치 병합 (BASE_URL 환경변수 분기 + vercel.json SPA 라우팅)
+> - 시연용 영상 3편으로 강의 목록 전체 교체 (사물궁이 잡학지식)
+> - 세션 자동 종료 로직 구현 (버튼 제거 → 영상 종료/강의 변경 시 자동 처리)
+> - 최소 1분 실제 재생 위치 기준 리포트 생성 조건 추가
+> - 세션 종료 중복 호출 방지 (`isEndingRef` + `finally` 리팩터링)
+> - seek 방지 오탐 수정 (`Date.now()` 기반 동적 임계값)
+
+---
+
+## 작업 내역 (날짜순)
+
+### 2026-04-11 (1) | 시연용 영상 교체 + 세션 자동 종료 로직
+
+#### develop 브랜치 병합 (`feat/khh` ← `origin/develop`)
+
+| 파일 | 변경 내용 |
+|------|---------|
+| `frontend/src/api/client.js` | `BASE_URL` 환경변수 분기 (배포 대응) |
+| `frontend/src/contexts/AuthContext.jsx` | `BASE_URL` 사용으로 Render 백엔드 API 라우팅 |
+| `frontend/src/services/api.js` | `BASE_URL` 환경변수 분기 |
+| `frontend/vercel.json` | SPA 라우팅 설정 추가 (새로고침 404 방지) |
+
+---
+
+#### 시연용 영상 3편으로 강의 목록 교체
+
+EBS 강의 영상 → 사물궁이 잡학지식 채널 영상으로 전체 교체. 분석 문서는 `docs/DEMO-VIDEO-ANALYSIS*.md` 참고.
+
+| 강의 ID | 제목 | YouTube ID | 길이 | SRT 항목 수 |
+|---------|------|-----------|------|------------|
+| lec-001 | 왜 조선시대 배경의 무협 소설은 없을까? | `E1gAsvazXZo` | 04:49 | 125개 |
+| lec-002 | 인간은 다시 젊어질 수 있을까? | `MTg2HYj-88c` | 05:42 | 146개 |
+| lec-003 | 유리는 왜 투명하고 잘 깨질까? | `CkqxHhdmlZk` | 08:02 | 200개 |
+
+**수정 파일:**
+- `backend/data/lectures.json` — 강의 정보 교체
+- `frontend/src/data/lectures.json` — 강의 정보 + duration/durationSec 교체
+- `backend/data/subtitles/lec-001.srt` — 조선무협.srt 복사
+- `backend/data/subtitles/lec-002.srt` — 인간젊어지기.srt 복사
+- `backend/data/subtitles/lec-003.srt` — 유리투명.srt 복사
+- `backend/data/subtitles/조선무협.srt` — 원본 자막 추가
+- `backend/data/subtitles/인간젊어지기.srt` — 원본 자막 추가
+- `backend/data/subtitles/유리투명.srt` — 원본 자막 추가
+
+> **적용 방법**: MongoDB 사용 시 `cd backend && node scripts/seedLectures.js` 재실행 필요.
+
+---
+
+#### 세션 자동 종료 로직 (`frontend/src/pages/StudentDashboard.jsx`)
+
+**기존**: 수동 "세션 종료 · 리포트 확인 →" 버튼으로만 종료
+
+**변경**: 버튼 제거, 아래 조건에 따라 자동 종료
+
+| 종료 트리거 | 1분 미만 시청 | 1분 이상 시청 |
+|-----------|------------|------------|
+| YouTube 영상 재생 완료 | 강의 목록으로 이동 | 리포트 자동 생성 |
+| 다른 강의 카드 선택 | 강의 목록으로 이동 | 리포트 자동 생성 |
+
+**구현 상세:**
+
+`sessionStartedRef`, `handleEndSessionRef` 추가 — YouTube `onStateChange` 콜백(클로저 환경)에서 최신 state 참조를 위한 ref 동기화 패턴 사용.
+
+```js
+// YouTube 플레이어 onStateChange
+onStateChange: (e) => {
+  if (e.data === window.YT.PlayerState.ENDED && sessionStartedRef.current) {
+    handleEndSessionRef.current?.(); // ?.() — ref null 안전성
+  }
+}
+
+// 세션 종료 처리
+const handleEndSession = async (force = false) => {
+  if (isEndingRef.current) return; // 중복 호출 가드
+  isEndingRef.current = true;
+
+  // YouTube 실제 재생 위치 기준 (seek 방지로 재생 위치 ≈ 실제 시청량)
+  // 플레이어 미준비 시 elapsedRef(세션 경과 시간)으로 폴백
+  const watched = playerRef.current?.getCurrentTime?.() ?? elapsedRef.current;
+
+  try {
+    if (sid) await sessionAPI.end(sid);
+    if (sid && (watched >= MIN_SESSION_SEC || force)) {
+      navigate(`/student/report/${sid}`);
+    } else {
+      navigate('/student');
+    }
+  } catch (_) {
+    navigate('/student');
+  } finally {
+    isEndingRef.current = false; // 모든 경로에서 반드시 리셋
+  }
+};
+```
+
+`handleLectureSelect` — 세션 진행 중 강의 변경 시 `handleEndSession()` 자동 호출 후 전환.
+
+1분 이상 시청 시 하단 컨트롤 바에 `"영상이 끝나면 리포트가 자동 생성됩니다"` 안내 문구 표시.
+
+**`isEndingRef` 도입 배경:**
+`handleEndSessionRef.current = null`로 중복을 막으려 했으나, 렌더마다 line 351에서 ref를 재등록하므로 비동기 처리 중 재발화 시 null이 덮어써져 두 번째 호출이 가능했음. `isEndingRef`는 렌더와 무관하게 유지되므로 안전.
+
+---
+
+#### seek 방지 오탐 수정 (`frontend/src/pages/StudentDashboard.jsx`)
+
+**기존 문제:** 1초 인터벌에서 `getCurrentTime()` 차이가 2초 초과이면 seek로 판단. 브라우저 타이머 지연(탭 전환, CPU 부하, 모바일)으로 정상 재생도 오탐 가능.
+
+```
+정상 재생 중 타이머 1.1초 지연:
+  재생 차이 = 1(재생) + 1.1(지연) = 2.1초 > 고정 임계값 2초 → 오탐 강제 복귀
+```
+
+**수정:** `lastCheckTimeRef`로 실제 인터벌 경과 시간을 측정하여 임계값을 동적 산출.
+
+```js
+const now = Date.now();
+const realElapsed = (now - lastCheckTimeRef.current) / 1000;
+lastCheckTimeRef.current = now;
+
+// 동적 임계값: 실경과 시간 + 여유 1.5초
+if (t - lastValidTimeRef.current > realElapsed + 1.5) {
+  playerRef.current.seekTo(lastValidTimeRef.current, true); // seek 감지
+}
+```
+
+```
+타이머 1.1초 지연, 정상 재생: realElapsed=2.1 → 임계값 3.6초 → 차이 2.1초 < 3.6초 → 오탐 없음 ✓
+타이머 정상, 5초 seek:        realElapsed=1.0 → 임계값 2.5초 → 차이 5.0초 > 2.5초 → 감지 ✓
+```
 
 ---
 
@@ -32,8 +157,6 @@
 | 배포 (Vercel + Render) | ❌ 미구현 |
 
 ---
-
-## 작업 내역 (날짜순)
 
 ### 2026-04-10 (7) | develop 브랜치 병합 + 버그 수정 (P1 3건 + 시드 타임스탬프)
 
