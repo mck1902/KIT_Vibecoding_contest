@@ -1,35 +1,35 @@
 [
   {
     "id": "lec-001",
-    "subject": "수학",
-    "title": "[EBS] 고등예비과정 수학 I",
-    "episode": "01강. 다항식의 연산 (1)",
-    "duration": "28:00",
-    "durationSec": 1680,
-    "progress": 45,
+    "subject": "역사/잡학",
+    "title": "왜 조선시대 배경의 무협 소설은 없을까?",
+    "episode": "사물궁이 잡학지식",
+    "duration": "04:49",
+    "durationSec": 289,
+    "progress": 0,
     "color": "#3b82f6",
-    "youtubeId": "P5l2heNKK_U"
+    "youtubeId": "E1gAsvazXZo"
   },
   {
     "id": "lec-002",
-    "subject": "영어",
-    "title": "[EBS] 의진샘의 고등학교 영어 정복법",
-    "episode": "딩-기초편",
-    "duration": "40:00",
-    "durationSec": 2400,
+    "subject": "과학/잡학",
+    "title": "인간은 다시 젊어질 수 있을까?",
+    "episode": "사물궁이 잡학지식",
+    "duration": "05:42",
+    "durationSec": 342,
     "progress": 0,
     "color": "#10b981",
-    "youtubeId": "F229WLqJ0uo"
+    "youtubeId": "MTg2HYj-88c"
   },
   {
     "id": "lec-003",
-    "subject": "화학",
-    "title": "[EBS] 개념완성 화학1",
-    "episode": "11강. 원자의 구조",
-    "duration": "30:00",
-    "durationSec": 1800,
+    "subject": "과학/잡학",
+    "title": "유리는 왜 투명하고 잘 깨질까?",
+    "episode": "사물궁이 잡학지식",
+    "duration": "08:02",
+    "durationSec": 482,
     "progress": 0,
     "color": "#f59e0b",
-    "youtubeId": "DXkcmESt99Y"
+    "youtubeId": "CkqxHhdmlZk"
   }
 ]
