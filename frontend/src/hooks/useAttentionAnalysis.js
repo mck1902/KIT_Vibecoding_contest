@@ -3,8 +3,8 @@ import * as tf from '@tensorflow/tfjs';
 import * as blazeface from '@tensorflow-models/blazeface';
 
 const MODEL_URL = '/models/mobilenet/model.json';
-const INFERENCE_INTERVAL = 3000; // 3초
-const NO_FACE_THRESHOLD = 5;    // 연속 5회(15초) 미감지 → 졸음
+const INFERENCE_INTERVAL = 1000; // 1초
+const NO_FACE_THRESHOLD = 5;    // 연속 5회(5초) 미감지 → 졸음
 
 /**
  * TF.js 기반 실시간 집중도 분석 훅

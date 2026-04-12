@@ -4,6 +4,7 @@ const {
   endSession,
   addRecords,
   addDeparture,
+  addPauseEvent,
   getSessionReport,
   getRagAnalysis,
   getSessions,
@@ -20,6 +21,7 @@ router.get('/:id', requireAuth, getSessionById);
 router.put('/:id/end', requireAuth, requireRole('student'), endSession);
 router.post('/:id/records', requireAuth, requireRole('student'), validate(schemas.addRecords), addRecords);
 router.post('/:id/departures', requireAuth, requireRole('student'), validate(schemas.addDeparture), addDeparture);
+router.post('/:id/pause-events', requireAuth, requireRole('student'), addPauseEvent);
 router.get('/:id/report', requireAuth, getSessionReport);
 router.get('/:id/rag-analysis', requireAuth, getRagAnalysis);
 
