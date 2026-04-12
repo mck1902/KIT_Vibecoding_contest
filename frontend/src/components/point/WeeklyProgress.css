@@ -1,0 +1,62 @@
+.weekly-progress-card {
+  padding: 1.5rem;
+  border-radius: 12px;
+}
+
+.weekly-progress-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-main);
+}
+
+.weekly-progress-empty {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.weekly-progress-bar-wrap {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--card-border);
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.weekly-progress-bar {
+  height: 100%;
+  border-radius: 5px;
+  background: var(--point-gold);
+  transition: width 0.5s ease;
+}
+
+.weekly-progress-bar.achieved {
+  background: var(--point-success);
+}
+
+.weekly-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.weekly-progress-count {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.weekly-progress-bonus {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.weekly-progress-bonus.achieved {
+  color: var(--point-success);
+}
+
+.weekly-progress-bonus.pending {
+  color: var(--text-muted);
+}

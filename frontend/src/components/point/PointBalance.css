@@ -1,0 +1,60 @@
+.point-balance-card {
+  padding: 1.5rem;
+  border-radius: 12px;
+}
+
+.point-balance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.point-balance-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.point-balance-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--point-gold);
+}
+
+.point-balance-earned {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.point-balance-earned strong {
+  color: var(--point-success);
+}
+
+.point-charge-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.point-charge-btn {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--point-gold);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  transition: background 0.2s, transform 0.1s;
+}
+
+.point-charge-btn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.2);
+  transform: translateY(-1px);
+}
+
+.point-charge-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
