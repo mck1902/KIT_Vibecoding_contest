@@ -9,6 +9,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { sessionAPI, edupointAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import './SessionReport.css';
 
 const FOCUS_COLOR = (pct) => {
@@ -30,6 +31,8 @@ function formatDuration(sec) {
 export default function SessionReport() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isParent = user?.role === 'parent';
 
   const [report, setReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(true);
@@ -112,9 +115,11 @@ export default function SessionReport() {
           </p>
         </div>
         <div className="sr-header-actions">
-          <button className="sr-btn secondary" onClick={() => navigate('/parent')}>
-            학부모 대시보드
-          </button>
+          {isParent && (
+            <button className="sr-btn secondary" onClick={() => navigate('/parent')}>
+              학부모 대시보드
+            </button>
+          )}
           <button className="sr-btn primary" onClick={() => navigate('/student')}>
             다른 강의 수강하기
           </button>
@@ -304,9 +309,11 @@ export default function SessionReport() {
 
       {/* 하단 액션 버튼 */}
       <div className="sr-footer-actions">
-        <button className="sr-btn secondary" onClick={() => navigate('/parent')}>
-          학부모 대시보드 보기
-        </button>
+        {isParent && (
+          <button className="sr-btn secondary" onClick={() => navigate('/parent')}>
+            학부모 대시보드 보기
+          </button>
+        )}
         <button className="sr-btn primary" onClick={() => navigate('/student')}>
           다른 강의 수강하기
         </button>
