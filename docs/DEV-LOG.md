@@ -1,20 +1,127 @@
 # EduWatch 개발 작업 내역
 
-> 최종 수정: 2026-04-11 | 공모전 마감: 2026-04-13
+> 최종 수정: 2026-04-12 | 공모전 마감: 2026-04-13
 
 ---
 
 > **[이번 세션 수정 요약]**
-> - develop 브랜치 병합 (BASE_URL 환경변수 분기 + vercel.json SPA 라우팅)
-> - 시연용 영상 3편으로 강의 목록 전체 교체 (사물궁이 잡학지식)
-> - 세션 자동 종료 로직 구현 (버튼 제거 → 영상 종료/강의 변경 시 자동 처리)
-> - 최소 1분 실제 재생 위치 기준 리포트 생성 조건 추가
-> - 세션 종료 중복 호출 방지 (`isEndingRef` + `finally` 리팩터링)
-> - seek 방지 오탐 수정 (`Date.now()` 기반 동적 임계값)
+> - fix/report-improvements 브랜치 병합 (AI 추론 개선 + focusProb 방식 도입)
+> - 에듀포인트 설정 진입 버튼 추가 (ParentDashboard 헤더 상시 노출)
+> - 에듀포인트 위젯 표시 조건 수정 (API 오류·미초기화 시 설정 유도 화면 보장)
+> - 세션 리포트 집중률 불일치 수정 (focusRate DB값 우선 사용)
+> - 포인트 달성 표시 불일치 수정: 목표 달성 + 잔액 부족 시 "미달성" 오표시 → "목표 달성 (잔액 부족)"으로 수정
 
 ---
 
 ## 작업 내역 (날짜순)
+
+### 2026-04-12 (1) | fix/report-improvements 병합 + 에듀포인트 버그 수정
+
+#### fix/report-improvements 브랜치 병합 (`feat/khh` ← `origin/fix/report-improvements`)
+
+| 파일 | 변경 내용 |
+|------|---------|
+| `backend/src/utils/claudeService.js` → `aiService.js` | 파일명 rename |
+| `backend/src/utils/constants.js` | `STATUS_TO_FOCUS`, `calcFocus` 상수 통합 신규 추가 |
+| `frontend/src/hooks/useAttentionAnalysis.js` | AI 추론 간격 1초, 서버 전송 3초 배치화, `focusProb` 확률 합산 방식 도입 |
+| `backend/src/controllers/sessionController.js` | `calcFocus(status, confidence, focusProb)` — focusProb 우선 사용 |
+| `docs/PLAN-QUIZ.md`, `PLAN-EDUPOINT.md` | 기능 계획 문서 추가 |
+
+---
+
+#### 에듀포인트 설정 진입 버튼 추가 (`frontend/src/pages/ParentDashboard.jsx`)
+
+**문제**: "포인트 설정하기" 링크가 에듀포인트 위젯 내부에만 존재 → 자녀 미연결 또는 다자녀 전체 보기 상태에서 위젯이 숨겨져 진입 불가.
+
+**수정**: 헤더 우측에 항상 노출되는 버튼 추가.
+
+```jsx
+<button className="point-nav-btn" onClick={() => navigate('/parent/point-settings')}>
+  🪙 에듀 포인트 설정
+</button>
+```
+
+- `useNavigate` 임포트 추가
+- `.point-nav-btn` CSS — outline 스타일, hover 시 primary 색상 채움
+
+---
+
+#### 에듀포인트 위젯 표시 조건 수정 (`frontend/src/pages/ParentDashboard.jsx`)
+
+**문제**: `edupointAPI.get()` 실패(API 오류·403) 시 catch에서 `setEdupoint(null)` → `if (!edupoint) return null`로 위젯 전체 숨김, 설정 유도 화면도 사라짐.
+
+```js
+// 수정 전
+if (!edupoint) return null;          // API 오류 시 위젯 통째로 숨김
+if (!edupoint.initialized) { ... }  // 설정 유도 화면
+
+// 수정 후
+if (!edupoint || !edupoint.initialized) { ... }  // null 포함해서 설정 유도 화면 표시
+```
+
+백엔드는 미초기화 학생에 대해 404가 아닌 `{ initialized: false }` 200 응답을 반환하므로, API 오류(500/403) 케이스만 null로 떨어짐. 수정 후 두 경우 모두 "포인트 설정하기 →" 안내 표시.
+
+---
+
+#### 세션 리포트 집중률 불일치 수정 (`backend/src/controllers/sessionController.js`)
+
+**문제**: `getReport`가 `avgFocus = calcAvgFocus(session.records)`로 재계산 → 세션 종료 직후 늦게 도착한 레코드가 포함되면 `endSession`에서 에듀포인트 비교에 쓴 `focusRate`와 불일치. 화면에 표시된 집중률과 포인트 달성 판단 기준이 달라 보이는 문제.
+
+```js
+// 수정 전
+const avgFocus = calcAvgFocus(session.records);  // 매번 재계산
+
+// 수정 후
+// endSession 저장값 우선, 미종료·구버전 데이터는 재계산 폴백
+const avgFocus = session.focusRate ?? calcAvgFocus(session.records);
+```
+
+`session.focusRate`는 `endSession` 시점에 DB에 저장되며, 에듀포인트 `targetRate` 비교에 쓰인 값과 동일 → 화면 표시와 포인트 판단이 일치.
+
+---
+
+### 2026-04-12 (2) | 포인트 달성 표시 불일치 수정
+
+#### 문제
+
+세션 진행 중 "달성!" 표시 → 리포트에서 "미달성 (0P)" 표시. 두 조건이 달랐음.
+
+| 위치 | 조건 |
+|------|------|
+| `StudentDashboard` 사이드바 | `cumulativeFocus >= targetRate` (프론트엔드 실시간 누적) |
+| `SessionReport` 에듀포인트 결과 | `(sessionDetail.pointEarned ?? 0) > 0` (DB 저장값) |
+
+학부모가 포인트를 충전하지 않은 경우(`balance = 0`), `awardPoints()` 내부 트랜잭션이 `InsufficientBalanceError`로 abort → 세션 DB의 `pointEarned` 가 `null` 그대로 → `(null ?? 0) > 0 = false` → "미달성 (0P)" 오표시.
+
+#### 수정 1 — `backend/src/controllers/sessionController.js`
+
+`focusRate >= targetRate` 이지만 잔액 부족(`awardPoints` null 반환) 시 `pointEarned: 0` 명시 저장.
+
+```js
+if (edupoint && focusRate >= edupoint.settings.targetRate) {
+  pointResult = await awardPoints(session._id, focusRate, edupoint);
+  if (!pointResult) {
+    // 목표 달성했으나 학부모 잔액 부족 — pointEarned: 0으로 기록 (null과 구분)
+    await Session.updateOne({ _id: session._id }, { pointEarned: 0 });
+  }
+} else if (edupoint) {
+  await Session.updateOne({ _id: session._id }, { pointEarned: 0 });
+}
+```
+
+#### 수정 2 — `frontend/src/pages/SessionReport.jsx`
+
+`report.avgFocus >= edupoint.settings.targetRate` 로 목표 달성 여부를 직접 판단해 3가지 상태 표시.
+
+```
+goalAchieved + pointsEarned > 0  →  "✓ +NP 획득!"
+goalAchieved + pointsEarned = 0  →  "✓ 목표 달성! (학부모 포인트 잔액 부족)"
+!goalAchieved                    →  "✗ 미달성 (0P)"
+```
+
+`pointEarned` 필드(포인트 지급 성공 여부)와 `goalAchieved`(집중률 목표 충족 여부)를 분리해 표시.
+
+---
 
 ### 2026-04-11 (1) | 시연용 영상 교체 + 세션 자동 종료 로직
 

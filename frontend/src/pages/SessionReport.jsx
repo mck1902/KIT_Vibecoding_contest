@@ -201,41 +201,56 @@ export default function SessionReport() {
       )}
 
       {/* 포인트 획득 결과 */}
-      {sessionDetail && edupoint?.initialized && (
-        <section className="sr-point-result glass">
-          <h3>에듀 포인트 결과</h3>
-          <div className="sr-point-result-body">
-            <div className="sr-point-focus-compare">
-              <div className="sr-point-focus-item">
-                <span className="sr-point-focus-label">세션 집중률</span>
-                <span className="sr-point-focus-value" style={{ color: focusColor }}>
-                  {report.avgFocus}%
-                </span>
+      {sessionDetail && edupoint?.initialized && (() => {
+        const goalAchieved = report.avgFocus >= edupoint.settings.targetRate;
+        const pointsEarned = sessionDetail.pointEarned ?? 0;
+        // 달성 여부에 따라 3가지 상태: 포인트 지급 / 잔액 부족 달성 / 미달성
+        const status = goalAchieved && pointsEarned > 0 ? 'achieved'
+          : goalAchieved ? 'achieved-no-balance'
+          : 'missed';
+        return (
+          <section className="sr-point-result glass">
+            <h3>에듀 포인트 결과</h3>
+            <div className="sr-point-result-body">
+              <div className="sr-point-focus-compare">
+                <div className="sr-point-focus-item">
+                  <span className="sr-point-focus-label">세션 집중률</span>
+                  <span className="sr-point-focus-value" style={{ color: focusColor }}>
+                    {report.avgFocus}%
+                  </span>
+                </div>
+                <span className="sr-point-focus-vs">vs</span>
+                <div className="sr-point-focus-item">
+                  <span className="sr-point-focus-label">목표 집중률</span>
+                  <span className="sr-point-focus-value" style={{ color: 'var(--primary)' }}>
+                    {edupoint.settings.targetRate}%
+                  </span>
+                </div>
               </div>
-              <span className="sr-point-focus-vs">vs</span>
-              <div className="sr-point-focus-item">
-                <span className="sr-point-focus-label">목표 집중률</span>
-                <span className="sr-point-focus-value" style={{ color: 'var(--primary)' }}>
-                  {edupoint.settings.targetRate}%
-                </span>
+              <div className={`sr-point-earned ${status === 'missed' ? 'missed' : 'achieved'}`}>
+                {status === 'achieved' && (
+                  <>
+                    <span className="sr-point-earned-icon">&#10003;</span>
+                    <span>+{pointsEarned.toLocaleString()}P 획득!</span>
+                  </>
+                )}
+                {status === 'achieved-no-balance' && (
+                  <>
+                    <span className="sr-point-earned-icon">&#10003;</span>
+                    <span>목표 달성! (학부모 포인트 잔액 부족)</span>
+                  </>
+                )}
+                {status === 'missed' && (
+                  <>
+                    <span className="sr-point-earned-icon">&#10007;</span>
+                    <span>미달성 (0P)</span>
+                  </>
+                )}
               </div>
             </div>
-            <div className={`sr-point-earned ${(sessionDetail.pointEarned ?? 0) > 0 ? 'achieved' : 'missed'}`}>
-              {(sessionDetail.pointEarned ?? 0) > 0 ? (
-                <>
-                  <span className="sr-point-earned-icon">&#10003;</span>
-                  <span>+{sessionDetail.pointEarned.toLocaleString()}P 획득!</span>
-                </>
-              ) : (
-                <>
-                  <span className="sr-point-earned-icon">&#10007;</span>
-                  <span>미달성 (0P)</span>
-                </>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
+          </section>
+        );
+      })()}
 
       <div className="sr-bottom-grid">
         {/* 규칙 기반 AI 코칭 */}

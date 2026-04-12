@@ -222,6 +222,10 @@ async function endSession(req, res) {
     const edupoint = await EduPoint.findOne({ studentId: session.studentId });
     if (edupoint && focusRate >= edupoint.settings.targetRate) {
       pointResult = await awardPoints(session._id, focusRate, edupoint);
+      if (!pointResult) {
+        // 목표 달성했으나 학부모 잔액 부족 — pointEarned: 0으로 기록 (null과 구분)
+        await Session.updateOne({ _id: session._id }, { pointEarned: 0 });
+      }
     } else if (edupoint) {
       // 목표 미달 — focusRate만 기록
       await Session.updateOne({ _id: session._id }, { pointEarned: 0 });
@@ -304,7 +308,9 @@ async function getSessionReport(req, res) {
       return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
     }
 
-    const avgFocus = calcAvgFocus(session.records);
+    // endSession에서 저장한 focusRate를 우선 사용 (에듀포인트 비교값과 일치 보장)
+    // 세션 진행 중(미종료) 또는 구버전 데이터는 records로 재계산
+    const avgFocus = session.focusRate ?? calcAvgFocus(session.records);
     const tips = generateRuleBasedTips({
       records: session.records,
       departures: session.departures,

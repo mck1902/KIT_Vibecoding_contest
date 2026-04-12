@@ -1,6 +1,7 @@
 /* 2026-04-09: 실 세션 데이터 + AI RAG 리포트 연동 */
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { sessionAPI, authAPI, edupointAPI } from '../services/api';
 import PointBalance from '../components/point/PointBalance';
 import PointHistory from '../components/point/PointHistory';
@@ -19,6 +20,7 @@ function formatDuration(sec) {
 
 const ParentDashboard = () => {
   const { user, updateUser } = useAuth();
+  const navigate = useNavigate();
 
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null); // null = 전체
@@ -132,7 +134,15 @@ const ParentDashboard = () => {
   return (
     <div className="dashboard-container container animate-fade-in">
       <header className="dashboard-header">
-        <h2>학습 대시보드</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>학습 대시보드</h2>
+          <button
+            className="point-nav-btn"
+            onClick={() => navigate('/parent/point-settings')}
+          >
+            🪙 에듀 포인트 설정
+          </button>
+        </div>
         <p className="subtitle">
           {selectedChild ? `${selectedChild.name}의 학습 리포트` : children.length > 0 ? `전체 자녀 (${children.length}명)` : '자녀를 연결해주세요'}
           {loading && <span className="loading-tag"> · 불러오는 중...</span>}
@@ -231,8 +241,7 @@ const ParentDashboard = () => {
       {(() => {
         const targetStudentId = selectedChild?.studentId || (children.length === 1 ? children[0].studentId : null);
         if (!targetStudentId) return null;
-        if (!edupoint) return null;
-        if (!edupoint.initialized) {
+        if (!edupoint || !edupoint.initialized) {
           return (
             <div className="point-setup-prompt glass" style={{ padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', textAlign: 'center' }}>
               <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>에듀 포인트 시스템이 설정되지 않았습니다.</p>

@@ -214,3 +214,20 @@
     grid-template-columns: 1fr;
   }
 }
+
+.point-nav-btn {
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.point-nav-btn:hover {
+  background: var(--primary);
+  color: #fff;
+}
