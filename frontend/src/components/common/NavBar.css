@@ -81,6 +81,17 @@
   gap: 0.6rem;
 }
 
+.nav-point-badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+
 .nav-username {
   font-weight: 500;
   font-size: 0.9rem;

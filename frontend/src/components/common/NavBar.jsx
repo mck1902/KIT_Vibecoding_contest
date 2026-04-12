@@ -1,13 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FiSun, FiMoon, FiLogOut, FiSettings } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
+import { edupointAPI } from '../../services/api';
 import './NavBar.css';
 
 const NavBar = ({ theme, toggleTheme }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [studentEarned, setStudentEarned] = useState(null);
+
+  // 학생 로그인 시 누적 포인트 조회 (페이지 이동 시마다 최신화)
+  useEffect(() => {
+    if (user?.role !== 'student' || !user?.studentId) {
+      setStudentEarned(null);
+      return;
+    }
+    edupointAPI.get(user.studentId)
+      .then(data => {
+        if (data.initialized) setStudentEarned(data.studentEarned ?? 0);
+        else setStudentEarned(null);
+      })
+      .catch(() => setStudentEarned(null));
+  }, [user?.studentId, location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -37,6 +53,11 @@ const NavBar = ({ theme, toggleTheme }) => {
           </button>
           {user ? (
             <div className="nav-user">
+              {studentEarned !== null && (
+                <span className="nav-point-badge">
+                  🪙 {studentEarned.toLocaleString()}P
+                </span>
+              )}
               <span className="nav-username">{user.name}</span>
               <Link
                 to="/settings"
