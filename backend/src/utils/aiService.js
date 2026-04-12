@@ -73,7 +73,7 @@ async function generateRagReport(sessionData, lectureSegments, lectureTitle) {
     const d = new Date(r.timestamp);
     const key = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     if (!byMinute[key]) byMinute[key] = [];
-    byMinute[key].push(calcFocus(r.status, r.confidence));
+    byMinute[key].push(calcFocus(r.status, r.confidence, r.focusProb));
   }
   const timelineText = Object.entries(byMinute)
     .map(([t, vals]) => `${t}: ${Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)}%`)

@@ -36,6 +36,7 @@ const StudentDashboard = () => {
   const sessionIdRef = useRef(null);
   const focusStatusRef = useRef(1);
   const focusLevelRef = useRef(85);
+  const focusConfidenceRef = useRef(0.5);
   const tabLeaveTimeRef = useRef(null);
   const lastValidTimeRef = useRef(0);
   const lastCheckTimeRef = useRef(Date.now());
@@ -50,11 +51,13 @@ const StudentDashboard = () => {
   // AI 분석 결과를 refs에 동기화 (백엔드 전송용)
   const focusStatus = tabWarning ? 4 : analysis.currentStatus;
   const focusLevel = tabWarning ? 45 : analysis.focusLevel;
+  const focusConfidence = tabWarning ? 0.5 : analysis.confidence;
 
   useEffect(() => {
     focusStatusRef.current = focusStatus;
     focusLevelRef.current = focusLevel;
-  }, [focusStatus, focusLevel]);
+    focusConfidenceRef.current = focusConfidence;
+  }, [focusStatus, focusLevel, focusConfidence]);
 
   // sessionStarted 및 handleEndSession을 ref에 동기화 (YouTube 콜백에서 사용)
   useEffect(() => {
@@ -160,7 +163,8 @@ const StudentDashboard = () => {
         await sessionAPI.addRecords(sessionIdRef.current, [{
           timestamp: new Date().toISOString(),
           status: focusStatusRef.current,
-          confidence: focusLevelRef.current / 100,
+          confidence: focusConfidenceRef.current,
+          focusProb: focusLevelRef.current,
         }]);
       } catch (_) {}
     }, 3000);
