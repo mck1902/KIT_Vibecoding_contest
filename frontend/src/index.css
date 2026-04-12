@@ -21,6 +21,9 @@
   --btn-text: #ffffff;
   --accent-color: #8b5cf6;
   --input-bg: #ffffff;
+  --point-gold: #f59e0b;
+  --point-success: #22c55e;
+  --point-danger: #ef4444;
 }
 
 [data-theme='dark'] {
@@ -36,6 +39,9 @@
   --btn-text: #ffffff;
   --accent-color: #a78bfa;
   --input-bg: #1e2535;
+  --point-gold: #fbbf24;
+  --point-success: #4ade80;
+  --point-danger: #f87171;
 }
 
 * {

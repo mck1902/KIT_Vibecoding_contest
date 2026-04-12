@@ -2,9 +2,12 @@ const mongoose = require('mongoose');
 const Session = require('../models/Session');
 const Lecture = require('../models/Lecture');
 const Parent = require('../models/Parent');
+const EduPoint = require('../models/EduPoint');
+const PointHistory = require('../models/PointHistory');
 const { generateRuleBasedTips, buildChartData } = require('../utils/reportGenerator');
 const { generateRagReport } = require('../utils/aiService');
 const { calcFocus } = require('../utils/constants');
+const { getWeekRangeKST } = require('../utils/weekUtils');
 
 // JWT의 childStudentIds를 신뢰하지 않고 DB에서 현재 상태를 조회
 // 학생이 연결 해제 후에도 기존 토큰으로 세션에 접근하는 권한 잔류 문제를 방지
@@ -28,6 +31,146 @@ function calcAvgFocus(records) {
   return Math.round(
     records.reduce((sum, r) => sum + calcFocus(r.status, r.confidence), 0) / records.length
   );
+}
+
+/**
+ * 세션 포인트 지급 — MongoDB 트랜잭션으로 원자적 처리
+ * Session.pointAwarded + EduPoint 잔액 차감/누적 증가 + PointHistory 생성을 묶음
+ * @returns {{ pointEarned, studentEarned, balance }} | null (미지급)
+ */
+// withTransaction 내부에서 abort 유도용 — retry 방지를 위해 비 transient 에러로 처리
+class InsufficientBalanceError extends Error {
+  constructor() { super('잔액 부족'); this.name = 'InsufficientBalanceError'; }
+  get hasErrorLabel() { return () => false; } // withTransaction이 retry하지 않도록
+}
+
+async function awardPoints(sessionId, focusRate, edupoint) {
+  // 방어 3 — 트랜잭션 진입 전 fast-fail (불필요한 write 시도 방지)
+  const alreadyEarned = await PointHistory.exists({ sessionId, type: 'earn' });
+  if (alreadyEarned) return null;
+
+  const mongoSession = await mongoose.startSession();
+  try {
+    let result = null;
+    await mongoSession.withTransaction(async () => {
+      // 방어 2 — pointAwarded 플래그 선점 (중복 방어)
+      const updated = await Session.findOneAndUpdate(
+        { _id: sessionId, pointAwarded: false },
+        { pointAwarded: true, focusRate, pointEarned: edupoint.settings.rewardPerSession },
+        { new: true, session: mongoSession }
+      );
+      if (!updated) return; // 이미 지급됨 → 변경 없이 정상 종료 → commit (no-op)
+
+      // 잔액 차감 + 학생 누적 증가
+      const charged = await EduPoint.findOneAndUpdate(
+        { _id: edupoint._id, balance: { $gte: edupoint.settings.rewardPerSession } },
+        { $inc: {
+          balance: -edupoint.settings.rewardPerSession,
+          studentEarned: +edupoint.settings.rewardPerSession,
+        }},
+        { new: true, session: mongoSession }
+      );
+      if (!charged) {
+        // 잔액 부족 → 에러 throw → withTransaction이 abort 처리
+        throw new InsufficientBalanceError();
+      }
+
+      // 방어 4 — PointHistory 기록 (유니크 인덱스가 물리적 최후 방어)
+      await PointHistory.create([{
+        studentId: updated.studentId,
+        parentId: edupoint.parentId,
+        type: 'earn',
+        amount: edupoint.settings.rewardPerSession,
+        reason: '세션달성',
+        sessionId,
+        parentBalanceAfter: charged.balance,
+        studentEarnedAfter: charged.studentEarned,
+      }], { session: mongoSession });
+
+      result = {
+        pointEarned: edupoint.settings.rewardPerSession,
+        studentEarned: charged.studentEarned,
+        balance: charged.balance,
+      };
+    });
+    return result;
+  } catch (err) {
+    // 잔액 부족은 정상적인 비즈니스 로직 — null 반환
+    if (err instanceof InsufficientBalanceError) return null;
+    throw err; // 그 외 에러는 상위로 전파
+  } finally {
+    await mongoSession.endSession();
+  }
+}
+
+/**
+ * 주간 보너스 판정 — 세션 보상과 별도 트랜잭션
+ */
+async function checkWeeklyBonus(studentId, edupoint) {
+  const { weekStart, weekEnd } = getWeekRangeKST();
+
+  // 적용할 보너스 설정 결정 (소급 방지)
+  let activeSettings;
+  if (!edupoint.settingsEffectiveFrom || edupoint.settingsEffectiveFrom <= weekStart) {
+    activeSettings = edupoint.settings;
+  } else if (edupoint.previousSettings?.weeklyBonusCount != null) {
+    activeSettings = edupoint.previousSettings;
+  } else {
+    return null; // 이전 설정 없음 → 보너스 판정 스킵
+  }
+
+  // 이번 주 달성 횟수 집계
+  const count = await Session.countDocuments({
+    studentId,
+    pointAwarded: true,
+    endTime: { $gte: weekStart, $lt: weekEnd },
+  });
+  if (count < activeSettings.weeklyBonusCount) return null;
+
+  // 중복 방지 — 이번 주 이미 지급했는지 확인
+  const alreadyAwarded = await PointHistory.exists({
+    studentId,
+    type: 'weekly_bonus',
+    createdAt: { $gte: weekStart, $lt: weekEnd },
+  });
+  if (alreadyAwarded) return null;
+
+  // 잔액 차감 시도
+  const charged = await EduPoint.findOneAndUpdate(
+    { _id: edupoint._id, balance: { $gte: activeSettings.weeklyBonusReward } },
+    { $inc: {
+      balance: -activeSettings.weeklyBonusReward,
+      studentEarned: +activeSettings.weeklyBonusReward,
+    }},
+    { new: true }
+  );
+
+  if (charged) {
+    await PointHistory.create({
+      studentId,
+      parentId: edupoint.parentId,
+      type: 'weekly_bonus',
+      amount: activeSettings.weeklyBonusReward,
+      reason: '주간보너스',
+      sessionId: null,
+      parentBalanceAfter: charged.balance,
+      studentEarnedAfter: charged.studentEarned,
+    });
+    return { weeklyBonus: activeSettings.weeklyBonusReward };
+  }
+
+  // 잔액 부족 — 실패 기록
+  await PointHistory.create({
+    studentId,
+    parentId: edupoint.parentId,
+    type: 'weekly_bonus_failed',
+    amount: 0,
+    reason: '잔액부족',
+    sessionId: null,
+    parentBalanceAfter: edupoint.balance,
+    studentEarnedAfter: edupoint.studentEarned,
+  });
+  return null;
 }
 
 // POST /api/sessions — 세션 시작
@@ -63,8 +206,42 @@ async function endSession(req, res) {
     if (session.studentId !== req.user.studentId) {
       return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
     }
-    await session.updateOne({ endTime: new Date() });
-    return res.status(200).json({ ...session.toObject(), endTime: new Date() });
+    // idempotency 가드 — 이미 종료된 세션은 기존 결과만 반환 (포인트 재지급 방지)
+    if (session.endTime) {
+      return res.status(200).json(session.toObject());
+    }
+
+    // 세션 종료 처리
+    const endTime = new Date();
+    const focusRate = calcAvgFocus(session.records);
+    await session.updateOne({ endTime, focusRate });
+
+    // 포인트 지급 시도
+    let pointResult = null;
+    let weeklyBonusResult = null;
+    const edupoint = await EduPoint.findOne({ studentId: session.studentId });
+    if (edupoint && focusRate >= edupoint.settings.targetRate) {
+      pointResult = await awardPoints(session._id, focusRate, edupoint);
+    } else if (edupoint) {
+      // 목표 미달 — focusRate만 기록
+      await Session.updateOne({ _id: session._id }, { pointEarned: 0 });
+    }
+
+    // 주간 보너스 판정 (포인트 지급 성공 시에만, 별도 트랜잭션)
+    if (pointResult && edupoint) {
+      const freshEdupoint = await EduPoint.findById(edupoint._id);
+      weeklyBonusResult = await checkWeeklyBonus(session.studentId, freshEdupoint);
+    }
+
+    const response = {
+      ...session.toObject(),
+      endTime,
+      focusRate,
+      pointEarned: pointResult?.pointEarned || 0,
+      studentEarned: pointResult?.studentEarned || null,
+      weeklyBonus: weeklyBonusResult?.weeklyBonus || null,
+    };
+    return res.status(200).json(response);
   } catch (error) {
     console.error('[endSession]', error);
     return res.status(500).json({ message: 'Failed to end session.' });
@@ -261,4 +438,5 @@ module.exports = {
   getRagAnalysis,
   getSessions,
   getSessionById,
+  hasSessionAccess,
 };

@@ -5,7 +5,8 @@ function validate(schema) {
   return (req, res, next) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      const message = result.error.errors[0]?.message || '입력값이 올바르지 않습니다.';
+      const issues = result.error.issues || result.error.errors || [];
+      const message = issues[0]?.message || '입력값이 올바르지 않습니다.';
       return res.status(400).json({ message });
     }
     req.body = result.data;
@@ -86,5 +87,16 @@ module.exports = {
     createSession: createSessionSchema,
     addRecords: addRecordsSchema,
     addDeparture: addDepartureSchema,
+    edupointSettings: z.object({
+      targetRate: z.number().int().min(50).max(95),
+      rewardPerSession: z.number().int().min(10).max(500),
+      weeklyBonusCount: z.number().int().min(1).max(7),
+      weeklyBonusReward: z.number().int().min(10).max(5000),
+    }),
+    edupointCharge: z.object({
+      amount: z.number().refine(v => [1000, 5000, 10000].includes(v), {
+        message: '충전 금액은 1000, 5000, 10000 중 하나여야 합니다.',
+      }),
+    }),
   },
 };

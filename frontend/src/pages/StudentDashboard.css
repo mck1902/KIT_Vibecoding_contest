@@ -507,3 +507,91 @@
   font-size: 0.78rem;
   color: var(--text-muted);
 }
+
+/* 에듀 포인트 — 목표 집중률 진행바 */
+.point-goal-bar {
+  margin-top: 0.8rem;
+  text-align: center;
+}
+
+.point-goal-label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.point-goal-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--card-border);
+  margin: 0.4rem 0;
+  overflow: hidden;
+}
+
+.point-goal-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.point-goal-achieved {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--point-success);
+}
+
+/* 에듀 포인트 — 포인트 위젯 */
+.point-widget {
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+}
+
+/* 목표 달성 축하 모달 */
+.goal-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+
+.goal-modal {
+  padding: 2.5rem 3rem;
+  border-radius: 16px;
+  text-align: center;
+  animation: scaleIn 0.3s ease;
+}
+
+.goal-modal-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.goal-modal h3 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.goal-modal-points {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--point-gold);
+}
+
+.goal-modal-total {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

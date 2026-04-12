@@ -1,7 +1,10 @@
 /* 2026-04-09: 실 세션 데이터 + AI RAG 리포트 연동 */
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { sessionAPI, authAPI } from '../services/api';
+import { sessionAPI, authAPI, edupointAPI } from '../services/api';
+import PointBalance from '../components/point/PointBalance';
+import PointHistory from '../components/point/PointHistory';
+import WeeklyProgress from '../components/point/WeeklyProgress';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './ParentDashboard.css';
 import './ParentDashboard.invite.css';
@@ -30,6 +33,8 @@ const ParentDashboard = () => {
   const [ragLoading, setRagLoading] = useState(false);
   const [ragError, setRagError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [edupoint, setEdupoint] = useState(null);
+  const [edupointRefresh, setEdupointRefresh] = useState(0);
 
   // 자녀 정보 + 세션 목록 불러오기 (children 변경 시 재조회)
   useEffect(() => {
@@ -70,6 +75,17 @@ const ParentDashboard = () => {
       .catch(() => setRagError('서버 연결 오류로 RAG 분석을 불러올 수 없습니다.'))
       .finally(() => setRagLoading(false));
   }, [selectedSessionId]);
+
+  // 에듀포인트 데이터 로딩
+  useEffect(() => {
+    const sid = selectedChild?.studentId || (children.length === 1 ? children[0].studentId : null);
+    if (!sid) { setEdupoint(null); return; }
+    edupointAPI.get(sid)
+      .then(data => setEdupoint(data))
+      .catch(() => setEdupoint(null));
+  }, [selectedChild?.studentId, children, edupointRefresh]);
+
+  const handleEdupointUpdate = () => setEdupointRefresh(k => k + 1);
 
   // 선택된 자녀 기준으로 세션 필터링
   const filteredSessions = selectedChild
@@ -210,6 +226,34 @@ const ParentDashboard = () => {
           </div>
         </div>
       </section>
+
+      {/* 에듀포인트 위젯 */}
+      {(() => {
+        const targetStudentId = selectedChild?.studentId || (children.length === 1 ? children[0].studentId : null);
+        if (!targetStudentId) return null;
+        if (!edupoint) return null;
+        if (!edupoint.initialized) {
+          return (
+            <div className="point-setup-prompt glass" style={{ padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', textAlign: 'center' }}>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>에듀 포인트 시스템이 설정되지 않았습니다.</p>
+              <a href="/parent/point-settings" style={{ color: 'var(--primary)', fontWeight: 600 }}>포인트 설정하기 &rarr;</a>
+            </div>
+          );
+        }
+        return (
+          <section className="point-widgets-section">
+            <div className="point-widgets-header">
+              <h3>에듀 포인트</h3>
+              <a href="/parent/point-settings" className="point-settings-link">설정</a>
+            </div>
+            <div className="point-widgets-grid">
+              <PointBalance studentId={targetStudentId} edupoint={edupoint} onUpdate={handleEdupointUpdate} />
+              <WeeklyProgress studentId={targetStudentId} edupoint={edupoint} refreshKey={edupointRefresh} />
+              <PointHistory studentId={targetStudentId} refreshKey={edupointRefresh} />
+            </div>
+          </section>
+        );
+      })()}
 
       <div className="dashboard-grid">
         <section className="chart-section glass">

@@ -174,3 +174,43 @@
   background: var(--input-bg);
   color: var(--text-main);
 }
+
+/* ── 에듀 포인트 위젯 섹션 ── */
+.point-widgets-section {
+  margin-bottom: 2.5rem;
+}
+
+.point-widgets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.point-widgets-header h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.point-settings-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.point-settings-link:hover {
+  text-decoration: underline;
+}
+
+.point-widgets-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .point-widgets-grid {
+    grid-template-columns: 1fr;
+  }
+}

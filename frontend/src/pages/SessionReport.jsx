@@ -8,7 +8,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { sessionAPI } from '../services/api';
+import { sessionAPI, edupointAPI } from '../services/api';
 import './SessionReport.css';
 
 const FOCUS_COLOR = (pct) => {
@@ -39,6 +39,9 @@ export default function SessionReport() {
   const [ragLoading, setRagLoading] = useState(true);
   const [ragError, setRagError] = useState(null);
 
+  const [sessionDetail, setSessionDetail] = useState(null);
+  const [edupoint, setEdupoint] = useState(null);
+
   // 리포트 + RAG 분석 병렬 로딩
   useEffect(() => {
     if (!sessionId) return;
@@ -54,6 +57,18 @@ export default function SessionReport() {
       .then((data) => setRagText(data.ragAnalysis))
       .catch((err) => setRagError(err.message))
       .finally(() => setRagLoading(false));
+
+    // 세션 상세 (포인트 정보 포함)
+    sessionAPI.getById(sessionId)
+      .then((data) => {
+        setSessionDetail(data);
+        if (data.studentId) {
+          edupointAPI.get(data.studentId)
+            .then(ep => setEdupoint(ep))
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
   }, [sessionId]);
 
   // ── 로딩 중 ──
@@ -182,6 +197,43 @@ export default function SessionReport() {
       ) : (
         <section className="sr-chart-section glass sr-no-data">
           <p>분석 데이터가 충분하지 않습니다. (학습 시간이 너무 짧거나 기록이 없습니다)</p>
+        </section>
+      )}
+
+      {/* 포인트 획득 결과 */}
+      {sessionDetail && edupoint?.initialized && (
+        <section className="sr-point-result glass">
+          <h3>에듀 포인트 결과</h3>
+          <div className="sr-point-result-body">
+            <div className="sr-point-focus-compare">
+              <div className="sr-point-focus-item">
+                <span className="sr-point-focus-label">세션 집중률</span>
+                <span className="sr-point-focus-value" style={{ color: focusColor }}>
+                  {report.avgFocus}%
+                </span>
+              </div>
+              <span className="sr-point-focus-vs">vs</span>
+              <div className="sr-point-focus-item">
+                <span className="sr-point-focus-label">목표 집중률</span>
+                <span className="sr-point-focus-value" style={{ color: 'var(--primary)' }}>
+                  {edupoint.settings.targetRate}%
+                </span>
+              </div>
+            </div>
+            <div className={`sr-point-earned ${(sessionDetail.pointEarned ?? 0) > 0 ? 'achieved' : 'missed'}`}>
+              {(sessionDetail.pointEarned ?? 0) > 0 ? (
+                <>
+                  <span className="sr-point-earned-icon">&#10003;</span>
+                  <span>+{sessionDetail.pointEarned.toLocaleString()}P 획득!</span>
+                </>
+              ) : (
+                <>
+                  <span className="sr-point-earned-icon">&#10007;</span>
+                  <span>미달성 (0P)</span>
+                </>
+              )}
+            </div>
+          </div>
         </section>
       )}
 

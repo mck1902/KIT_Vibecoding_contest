@@ -28,6 +28,9 @@ const sessionSchema = new mongoose.Schema(
     records: { type: [recordSchema], default: [] },
     departures: { type: [departureSchema], default: [] },
     ragAnalysis: { type: String, default: null },  // 생성 후 캐시 — API 재호출 방지
+    focusRate: { type: Number, default: null },
+    pointEarned: { type: Number, default: null },
+    pointAwarded: { type: Boolean, default: false },
   },
   {
     timestamps: true,

@@ -1,0 +1,243 @@
+.ps-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.ps-header {
+  margin-bottom: 2rem;
+}
+
+.ps-header h2 {
+  font-size: 1.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.ps-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0;
+}
+.ps-back-btn:hover {
+  color: var(--primary);
+}
+
+.ps-child-select {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg);
+  color: var(--text-main);
+  font-size: 0.9rem;
+}
+
+.ps-child-name {
+  display: inline-block;
+  margin-top: 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* 잔액 + 충전 영역 */
+.ps-balance-section {
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.ps-balance-info {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1rem;
+}
+
+.ps-balance-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ps-balance-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ps-balance-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--point-gold);
+}
+.ps-balance-value.earned {
+  color: var(--point-success);
+}
+
+.ps-charge-row {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.ps-charge-btn {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ps-charge-btn:hover:not(:disabled) {
+  border-color: var(--point-gold);
+  background: rgba(251, 191, 36, 0.1);
+}
+.ps-charge-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ps-notice {
+  margin-top: 0.8rem;
+  font-size: 0.82rem;
+  color: var(--point-gold);
+}
+
+/* 목표 설정 영역 */
+.ps-settings-section {
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.ps-settings-section h3 {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ps-field {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.ps-field label {
+  min-width: 120px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.ps-slider-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.ps-slider-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--primary);
+}
+
+.ps-slider-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+}
+
+.ps-input {
+  width: 100px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: var(--input-bg);
+  color: var(--text-main);
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+.ps-unit {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ps-btn {
+  display: block;
+  width: 100%;
+  padding: 0.7rem;
+  margin-top: 1.5rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.ps-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ps-btn.primary {
+  background: var(--primary);
+  color: var(--btn-text);
+}
+.ps-btn.primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+.ps-btn.secondary {
+  background: var(--card-bg);
+  color: var(--text-main);
+  border: 1px solid var(--card-border);
+}
+
+/* 메시지 */
+.ps-message {
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}
+.ps-message.success {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--point-success);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+.ps-message.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--point-danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* 반응형 */
+@media (max-width: 600px) {
+  .ps-balance-info {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .ps-charge-row {
+    flex-direction: column;
+  }
+  .ps-field {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+  .ps-slider-row {
+    width: 100%;
+  }
+}

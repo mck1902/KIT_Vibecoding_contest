@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { sessionAPI } from '../services/api';
+import { sessionAPI, edupointAPI } from '../services/api';
 import lectures from '../data/lectures.json';
 import useWebcam from '../hooks/useWebcam';
 import useAttentionAnalysis from '../hooks/useAttentionAnalysis';
@@ -17,6 +17,9 @@ const STATUS_MAP = {
   5: { label: '졸음',            color: '#ef4444' },
 };
 
+// 백엔드 calcFocus와 동일한 가중치 매핑 (누적 집중률 계산용)
+const STATUS_TO_FOCUS = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
+
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -28,6 +31,14 @@ const StudentDashboard = () => {
   const [ytCurrentTime, setYtCurrentTime] = useState(0);
   const [ytDuration, setYtDuration] = useState(0);
   const [playerReady, setPlayerReady] = useState(false);
+
+  // 에듀 포인트 상태
+  const [targetRate, setTargetRate] = useState(null);    // 목표 집중률 (null이면 미설정)
+  const [studentEarned, setStudentEarned] = useState(0);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [earnedPoints, setEarnedPoints] = useState(0);
+  const [cumulativeFocus, setCumulativeFocus] = useState(0); // 누적 집중률
+  const recordCountRef = useRef(0);
 
   const elapsedRef = useRef(0);
   const playerRef = useRef(null);
@@ -151,18 +162,32 @@ const StudentDashboard = () => {
     return () => clearInterval(interval);
   }, [sessionStarted]);
 
-  // 집중도 분류 결과를 3초마다 백엔드로 전송
+  // 집중도 분류 결과를 3초마다 백엔드로 전송 + 누적 집중률 계산
+  const focusSumRef = useRef(0);
   useEffect(() => {
-    if (!sessionStarted) return;
+    if (!sessionStarted) {
+      focusSumRef.current = 0;
+      recordCountRef.current = 0;
+      setCumulativeFocus(0);
+      return;
+    }
     const interval = setInterval(async () => {
       if (!sessionIdRef.current) return;
+      const currentStatus = focusStatusRef.current;
+      const conf = focusLevelRef.current / 100;
       try {
         await sessionAPI.addRecords(sessionIdRef.current, [{
           timestamp: new Date().toISOString(),
-          status: focusStatusRef.current,
-          confidence: focusLevelRef.current / 100,
+          status: currentStatus,
+          confidence: conf,
         }]);
       } catch (_) {}
+      // 누적 집중률 갱신 (calcFocus와 동일: base * conf + 50 * (1-conf))
+      const base = STATUS_TO_FOCUS[currentStatus] || 50;
+      const score = Math.round(base * conf + 50 * (1 - conf));
+      focusSumRef.current += score;
+      recordCountRef.current += 1;
+      setCumulativeFocus(Math.round(focusSumRef.current / recordCountRef.current));
     }, 3000);
     return () => clearInterval(interval);
   }, [sessionStarted]);
@@ -320,6 +345,20 @@ const StudentDashboard = () => {
       sessionIdRef.current = null;
     }
 
+    // 포인트 설정 로드 (목표 집중률)
+    if (user?.studentId) {
+      edupointAPI.get(user.studentId)
+        .then(data => {
+          if (data.initialized) {
+            setTargetRate(data.settings?.targetRate ?? null);
+            setStudentEarned(data.studentEarned ?? 0);
+          } else {
+            setTargetRate(null);
+          }
+        })
+        .catch(() => setTargetRate(null));
+    }
+
     setSessionStarted(true);
     setElapsed(0);
     elapsedRef.current = 0;
@@ -348,8 +387,23 @@ const StudentDashboard = () => {
     setSessionStarted(false);
 
     try {
-      if (sid) await sessionAPI.end(sid);
-      if (sid && (watched >= MIN_SESSION_SEC || force)) {
+      let endData = null;
+      if (sid) endData = await sessionAPI.end(sid);
+      // 포인트 획득 시 축하 모달 표시 후 리포트로 이동
+      if (endData?.pointEarned > 0) {
+        setEarnedPoints(endData.pointEarned);
+        setStudentEarned(endData.studentEarned ?? studentEarned);
+        setShowGoalModal(true);
+        // 2초 후 자동으로 리포트 페이지로 이동
+        setTimeout(() => {
+          setShowGoalModal(false);
+          if (watched >= MIN_SESSION_SEC || force) {
+            navigate(`/student/report/${sid}`);
+          } else {
+            navigate('/student');
+          }
+        }, 2500);
+      } else if (sid && (watched >= MIN_SESSION_SEC || force)) {
         navigate(`/student/report/${sid}`);
       } else {
         navigate('/student');
@@ -496,6 +550,25 @@ const StudentDashboard = () => {
             <p className="status-label" style={{ color: sessionStarted ? status.color : 'var(--text-muted)' }}>
               {sessionStarted ? status.label : '강의를 시작해주세요'}
             </p>
+            {sessionStarted && targetRate !== null && (
+              <div className="point-goal-bar">
+                <span className="point-goal-label">
+                  목표: {targetRate}% / 현재: {cumulativeFocus}%
+                </span>
+                <div className="point-goal-track">
+                  <div
+                    className="point-goal-fill"
+                    style={{
+                      width: `${Math.min(100, (cumulativeFocus / targetRate) * 100)}%`,
+                      background: cumulativeFocus >= targetRate ? 'var(--point-success)' : 'var(--point-gold)',
+                    }}
+                  ></div>
+                </div>
+                {cumulativeFocus >= targetRate && (
+                  <span className="point-goal-achieved">달성!</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="session-stats glass">
@@ -510,6 +583,17 @@ const StudentDashboard = () => {
               <span className="stat-value">{formatTime(elapsed)}</span>
             </div>
           </div>
+
+          {targetRate !== null && (
+            <div className="point-widget glass">
+              <div className="stat-item">
+                <span className="stat-label">내 포인트</span>
+                <span className="stat-value" style={{ color: 'var(--point-gold)' }}>
+                  {studentEarned.toLocaleString()}P
+                </span>
+              </div>
+            </div>
+          )}
 
           {user?.inviteCode && (
             <div className="invite-code-card glass">
@@ -528,6 +612,18 @@ const StudentDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* 목표 달성 축하 모달 */}
+      {showGoalModal && (
+        <div className="goal-modal-overlay">
+          <div className="goal-modal glass">
+            <div className="goal-modal-icon">🎉</div>
+            <h3>목표 달성!</h3>
+            <p className="goal-modal-points">+{earnedPoints.toLocaleString()}P</p>
+            <p className="goal-modal-total">누적 {studentEarned.toLocaleString()}P</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

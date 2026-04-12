@@ -96,6 +96,29 @@ export const sessionAPI = {
 };
 
 // ──────────────────────────────────────────────
+// 에듀포인트 API
+// ──────────────────────────────────────────────
+export const edupointAPI = {
+  /** 포인트 설정 & 잔액 조회 → EduPoint 문서 (미설정 시 initialized: false + 기본값) */
+  get: (studentId) =>
+    request('GET', `/edupoint/${studentId}`),
+
+  /** 포인트 설정 변경 (학부모 전용, upsert) */
+  updateSettings: (studentId, settings) =>
+    request('PUT', `/edupoint/${studentId}/settings`, settings),
+
+  /** 포인트 충전 — 시뮬레이션 (학부모 전용) */
+  charge: (studentId, amount) =>
+    request('POST', `/edupoint/${studentId}/charge`, { amount }),
+
+  /** 포인트 내역 조회 → { history: [...], total: N } */
+  getHistory: (studentId, params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request('GET', `/edupoint/${studentId}/history${query ? '?' + query : ''}`);
+  },
+};
+
+// ──────────────────────────────────────────────
 // 강좌 API
 // ──────────────────────────────────────────────
 export const lectureAPI = {
