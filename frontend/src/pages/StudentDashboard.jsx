@@ -37,6 +37,7 @@ const StudentDashboard = () => {
   const focusStatusRef = useRef(1);
   const focusLevelRef = useRef(85);
   const focusConfidenceRef = useRef(0.5);
+  const recordBufferRef = useRef([]);
   const tabLeaveTimeRef = useRef(null);
   const lastValidTimeRef = useRef(0);
   const lastCheckTimeRef = useRef(Date.now());
@@ -154,22 +155,45 @@ const StudentDashboard = () => {
     return () => clearInterval(interval);
   }, [sessionStarted]);
 
-  // 집중도 분류 결과를 3초마다 백엔드로 전송
+  // 버퍼 flush 헬퍼 (남은 record 일괄 전송)
+  const flushRecordBuffer = useCallback(async () => {
+    if (!sessionIdRef.current || recordBufferRef.current.length === 0) return;
+    const batch = recordBufferRef.current.splice(0);
+    try {
+      await sessionAPI.addRecords(sessionIdRef.current, batch);
+    } catch (_) {}
+  }, []);
+
+  // 1초마다 record 버퍼에 적재, 3초마다 배치 전송
   useEffect(() => {
     if (!sessionStarted) return;
+    let tick = 0;
+
     const interval = setInterval(async () => {
       if (!sessionIdRef.current) return;
-      try {
-        await sessionAPI.addRecords(sessionIdRef.current, [{
-          timestamp: new Date().toISOString(),
-          status: focusStatusRef.current,
-          confidence: focusConfidenceRef.current,
-          focusProb: focusLevelRef.current,
-        }]);
-      } catch (_) {}
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [sessionStarted]);
+
+      // 매 틱(1초)마다 현재 상태를 버퍼에 추가
+      recordBufferRef.current.push({
+        timestamp: new Date().toISOString(),
+        status: focusStatusRef.current,
+        confidence: focusConfidenceRef.current,
+        focusProb: focusLevelRef.current,
+      });
+
+      // 3틱(3초)마다 버퍼 flush
+      tick += 1;
+      if (tick >= 3) {
+        tick = 0;
+        await flushRecordBuffer();
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      // 언마운트 시 버퍼에 남은 record 전송
+      flushRecordBuffer();
+    };
+  }, [sessionStarted, flushRecordBuffer]);
 
   // 전체화면 판정: 브라우저 창 최대화 OR 영상 전체화면(Fullscreen API)
   const isFullscreen = useCallback(() => {
@@ -339,6 +363,9 @@ const StudentDashboard = () => {
   const handleEndSession = async (force = false) => {
     if (isEndingRef.current) return;
     isEndingRef.current = true;
+
+    // 버퍼에 남은 record 전송 (세션 ID 유효할 때)
+    await flushRecordBuffer();
 
     analysis.stopAnalysis();
     webcam.stop();
