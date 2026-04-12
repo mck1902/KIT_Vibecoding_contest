@@ -114,6 +114,27 @@ async function addDeparture(req, res) {
   }
 }
 
+// POST /api/sessions/:id/pause-events — 일시정지 기록
+async function addPauseEvent(req, res) {
+  try {
+    const { id } = req.params;
+    const { pauseTime, resumeTime, duration, videoTime } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid session ID.' });
+    }
+    const session = await Session.findById(id);
+    if (!session) return res.status(404).json({ message: 'Session not found.' });
+    if (session.studentId !== req.user.studentId) {
+      return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
+    }
+    await session.updateOne({ $push: { pauseEvents: { pauseTime, resumeTime, duration, videoTime } } });
+    return res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error('[addPauseEvent]', error);
+    return res.status(500).json({ message: 'Failed to add pause event.' });
+  }
+}
+
 // GET /api/sessions/:id/report — 규칙 기반 리포트
 async function getSessionReport(req, res) {
   try {
@@ -188,7 +209,14 @@ async function getRagAnalysis(req, res) {
     let ragText;
     try {
       ragText = await generateRagReport(
-        { records: session.records, departures: session.departures, avgFocus },
+        {
+          records: session.records,
+          departures: session.departures,
+          pauseEvents: session.pauseEvents || [],
+          avgFocus,
+          startTime: session.startTime,
+          endTime: session.endTime,
+        },
         lecture.segments,
         lecture.title
       );
@@ -257,6 +285,7 @@ module.exports = {
   endSession,
   addRecords,
   addDeparture,
+  addPauseEvent,
   getSessionReport,
   getRagAnalysis,
   getSessions,

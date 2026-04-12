@@ -6,6 +6,7 @@ const recordSchema = new mongoose.Schema(
     status: { type: Number, required: true, min: 1, max: 5 },
     confidence: { type: Number, default: 0, min: 0, max: 1 },
     focusProb: { type: Number, default: null, min: 0, max: 100 },
+    videoTime: { type: Number, default: null, min: 0 },
   },
   { _id: false }
 );
@@ -28,6 +29,16 @@ const sessionSchema = new mongoose.Schema(
     endTime: { type: Date, default: null },
     records: { type: [recordSchema], default: [] },
     departures: { type: [departureSchema], default: [] },
+    pauseEvents: {
+      type: [{
+        pauseTime: { type: Date, required: true },
+        resumeTime: { type: Date, default: null },
+        duration: { type: Number, default: 0, min: 0 },
+        videoTime: { type: Number, default: null, min: 0 },
+        _id: false,
+      }],
+      default: [],
+    },
     ragAnalysis: { type: String, default: null },  // 생성 후 캐시 — API 재호출 방지
   },
   {

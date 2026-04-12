@@ -78,6 +78,10 @@ export const sessionAPI = {
   addDeparture: (sessionId, departure) =>
     request('POST', `/sessions/${sessionId}/departures`, departure),
 
+  /** 일시정지 기록 저장 */
+  addPauseEvent: (sessionId, pauseEvent) =>
+    request('POST', `/sessions/${sessionId}/pause-events`, pauseEvent),
+
   /** 규칙 기반 리포트 조회 → { sessionId, avgFocus, totalSec, departureCount, chartData, tips, ... } */
   getReport: (sessionId) =>
     request('GET', `/sessions/${sessionId}/report`),

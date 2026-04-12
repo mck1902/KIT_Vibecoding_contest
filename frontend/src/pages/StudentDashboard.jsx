@@ -38,12 +38,15 @@ const StudentDashboard = () => {
   const focusLevelRef = useRef(85);
   const focusConfidenceRef = useRef(0.5);
   const recordBufferRef = useRef([]);
+  const ytCurrentTimeRef = useRef(0);
   const tabLeaveTimeRef = useRef(null);
   const lastValidTimeRef = useRef(0);
   const lastCheckTimeRef = useRef(Date.now());
   const sessionStartedRef = useRef(false);
   const handleEndSessionRef = useRef(null);
   const isEndingRef = useRef(false);
+  const pauseStartRef = useRef(null);
+  const pauseVideoTimeRef = useRef(null);
 
   // 웹캠 + AI 분석 훅
   const webcam = useWebcam();
@@ -92,6 +95,26 @@ const StudentDashboard = () => {
             // 영상 재생 완료 시 자동 세션 종료
             if (e.data === window.YT.PlayerState.ENDED && sessionStartedRef.current) {
               handleEndSessionRef.current?.();
+            }
+            // 일시정지 감지
+            if (e.data === window.YT.PlayerState.PAUSED && sessionStartedRef.current) {
+              pauseStartRef.current = new Date();
+              pauseVideoTimeRef.current = e.target.getCurrentTime();
+            }
+            // 재생 재개 감지 (일시정지 상태에서)
+            if (e.data === window.YT.PlayerState.PLAYING && pauseStartRef.current && sessionStartedRef.current) {
+              const resumeTime = new Date();
+              const duration = resumeTime - pauseStartRef.current;
+              if (sessionIdRef.current && duration > 1000) { // 1초 이상 일시정지만 기록
+                sessionAPI.addPauseEvent(sessionIdRef.current, {
+                  pauseTime: pauseStartRef.current.toISOString(),
+                  resumeTime: resumeTime.toISOString(),
+                  duration,
+                  videoTime: Math.round((pauseVideoTimeRef.current || 0) * 10) / 10,
+                }).catch(() => {});
+              }
+              pauseStartRef.current = null;
+              pauseVideoTimeRef.current = null;
             }
           },
         },
@@ -148,6 +171,7 @@ const StudentDashboard = () => {
           } else {
             lastValidTimeRef.current = t;
             setYtCurrentTime(t);
+            ytCurrentTimeRef.current = t;
           }
         } catch (_) {}
       }
@@ -178,6 +202,7 @@ const StudentDashboard = () => {
         status: focusStatusRef.current,
         confidence: focusConfidenceRef.current,
         focusProb: focusLevelRef.current,
+        videoTime: Math.round(ytCurrentTimeRef.current * 10) / 10,
       });
 
       // 3틱(3초)마다 버퍼 flush
