@@ -133,6 +133,15 @@
   display: flex;
   align-items: center;
   gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.ps-field-hint {
+  flex-basis: 100%;
+  margin: 0.25rem 0 0 128px; /* label min-width + gap 만큼 들여쓰기 */
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  opacity: 0.8;
 }
 
 .ps-field label {

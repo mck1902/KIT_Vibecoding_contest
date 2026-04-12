@@ -158,11 +158,24 @@
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1rem;
   background: rgba(0, 0, 0, 0.55);
   z-index: 10;
   border-radius: 12px;
+}
+
+.start-point-badge {
+  background: rgba(234, 179, 8, 0.2);
+  border: 1px solid rgba(234, 179, 8, 0.5);
+  color: #fcd34d;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.35rem 0.9rem;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
 }
 
 .start-session-btn {

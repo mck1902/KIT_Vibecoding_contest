@@ -192,6 +192,7 @@ const ParentPointSettings = () => {
             className="ps-input"
           />
           <span className="ps-unit">P</span>
+          <p className="ps-field-hint">목표 집중률 달성 시 강의 1회 완료마다 지급</p>
         </div>
 
         <h3 style={{ marginTop: '1.5rem' }}><Trophy size={18} /> 주간 보너스 조건</h3>

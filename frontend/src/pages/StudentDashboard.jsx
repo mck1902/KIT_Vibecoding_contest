@@ -34,6 +34,7 @@ const StudentDashboard = () => {
 
   // 에듀 포인트 상태
   const [targetRate, setTargetRate] = useState(null);    // 목표 집중률 (null이면 미설정)
+  const [rewardPerSession, setRewardPerSession] = useState(null); // 세션당 보상 포인트
   const [studentEarned, setStudentEarned] = useState(0);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [earnedPoints, setEarnedPoints] = useState(0);
@@ -79,9 +80,20 @@ const StudentDashboard = () => {
     sessionStartedRef.current = sessionStarted;
   }, [sessionStarted]);
 
-  // 컴포넌트 마운트 시 모델 사전 로딩
+  // 컴포넌트 마운트 시 모델 사전 로딩 + 에듀포인트 설정 미리 로드
   useEffect(() => {
     analysis.loadModels();
+    if (user?.studentId) {
+      edupointAPI.get(user.studentId)
+        .then(data => {
+          if (data.initialized) {
+            setTargetRate(data.settings?.targetRate ?? null);
+            setRewardPerSession(data.settings?.rewardPerSession ?? null);
+            setStudentEarned(data.studentEarned ?? 0);
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   // YouTube IFrame API 로드 및 플레이어 초기화
@@ -200,7 +212,9 @@ const StudentDashboard = () => {
     } catch (_) {}
     // 누적 집중률 갱신 (백엔드 calcFocus와 동일: focusProb 우선, 없으면 status 가중치)
     for (const r of batch) {
-      const score = r.focusProb != null ? Math.round(r.focusProb) : (STATUS_TO_FOCUS[r.status] || 50);
+      const base = STATUS_TO_FOCUS[r.status] || 50;
+      const conf = Math.max(0, Math.min(1, r.confidence ?? 1));
+      const score = r.focusProb != null ? Math.round(r.focusProb) : Math.round(base * conf + 50 * (1 - conf));
       focusSumRef.current += score;
       recordCountRef.current += 1;
     }
@@ -399,18 +413,20 @@ const StudentDashboard = () => {
       sessionIdRef.current = null;
     }
 
-    // 포인트 설정 로드 (목표 집중률)
+    // 포인트 설정 로드 (세션 시작 시 최신값 갱신)
     if (user?.studentId) {
       edupointAPI.get(user.studentId)
         .then(data => {
           if (data.initialized) {
             setTargetRate(data.settings?.targetRate ?? null);
+            setRewardPerSession(data.settings?.rewardPerSession ?? null);
             setStudentEarned(data.studentEarned ?? 0);
           } else {
             setTargetRate(null);
+            setRewardPerSession(null);
           }
         })
-        .catch(() => setTargetRate(null));
+        .catch(() => { setTargetRate(null); setRewardPerSession(null); });
     }
 
     setSessionStarted(true);
@@ -541,6 +557,11 @@ const StudentDashboard = () => {
             <div id="yt-player" className="yt-iframe-container"></div>
             {!sessionStarted && (
               <div className="start-overlay">
+                {targetRate !== null && rewardPerSession !== null && (
+                  <div className="start-point-badge">
+                    집중률 {targetRate}% 달성 시 +{rewardPerSession.toLocaleString()}P
+                  </div>
+                )}
                 <button className="start-session-btn" onClick={handleStartSession} disabled={!playerReady}>
                   <span className="play-icon">▶</span>
                   <span>{playerReady ? '강의 시작' : '로딩 중...'}</span>
@@ -649,6 +670,14 @@ const StudentDashboard = () => {
                   {studentEarned.toLocaleString()}P
                 </span>
               </div>
+              {rewardPerSession !== null && (
+                <div className="stat-item">
+                  <span className="stat-label">이번 강의 획득 가능</span>
+                  <span className="stat-value" style={{ color: cumulativeFocus >= targetRate ? 'var(--point-success)' : 'var(--text-muted)', fontSize: '0.9rem' }}>
+                    +{rewardPerSession.toLocaleString()}P
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
