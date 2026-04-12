@@ -37,6 +37,11 @@ const StudentDashboard = () => {
   const focusStatusRef = useRef(1);
   const focusLevelRef = useRef(85);
   const tabLeaveTimeRef = useRef(null);
+  const lastValidTimeRef = useRef(0);
+  const lastCheckTimeRef = useRef(Date.now());
+  const sessionStartedRef = useRef(false);
+  const handleEndSessionRef = useRef(null);
+  const isEndingRef = useRef(false);
 
   // 웹캠 + AI 분석 훅
   const webcam = useWebcam();
@@ -50,6 +55,11 @@ const StudentDashboard = () => {
     focusStatusRef.current = focusStatus;
     focusLevelRef.current = focusLevel;
   }, [focusStatus, focusLevel]);
+
+  // sessionStarted 및 handleEndSession을 ref에 동기화 (YouTube 콜백에서 사용)
+  useEffect(() => {
+    sessionStartedRef.current = sessionStarted;
+  }, [sessionStarted]);
 
   // 컴포넌트 마운트 시 모델 사전 로딩
   useEffect(() => {
@@ -73,6 +83,12 @@ const StudentDashboard = () => {
             setPlayerReady(true);
             const dur = e.target.getDuration();
             if (dur > 0) setYtDuration(dur);
+          },
+          onStateChange: (e) => {
+            // 영상 재생 완료 시 자동 세션 종료
+            if (e.data === window.YT.PlayerState.ENDED && sessionStartedRef.current) {
+              handleEndSessionRef.current?.();
+            }
           },
         },
       });
@@ -104,16 +120,31 @@ const StudentDashboard = () => {
     }
   }, [selectedLecture]);
 
-  // 세션 중 YouTube 재생 시간 추적
+  // 세션 중 YouTube 재생 시간 추적 + 시간 이동(seek) 방지
   useEffect(() => {
     if (!sessionStarted) return;
+    lastValidTimeRef.current = 0;
+    lastCheckTimeRef.current = Date.now();
     const interval = setInterval(() => {
       if (playerRef.current && playerReadyRef.current) {
         try {
           const t = playerRef.current.getCurrentTime();
           const d = playerRef.current.getDuration();
-          if (t !== undefined) setYtCurrentTime(t);
           if (d > 0) setYtDuration(d);
+          if (t === undefined) return;
+
+          // 실제 인터벌 경과 시간 측정 (브라우저 타이머 지연 대응)
+          const now = Date.now();
+          const realElapsed = (now - lastCheckTimeRef.current) / 1000;
+          lastCheckTimeRef.current = now;
+
+          // 재생 차이가 실경과 시간 + 여유(1.5초) 초과 시 seek로 판단해 복귀
+          if (t - lastValidTimeRef.current > realElapsed + 1.5) {
+            playerRef.current.seekTo(lastValidTimeRef.current, true);
+          } else {
+            lastValidTimeRef.current = t;
+            setYtCurrentTime(t);
+          }
         } catch (_) {}
       }
     }, 1000);
@@ -299,26 +330,47 @@ const StudentDashboard = () => {
     }
   };
 
-  const handleEndSession = async () => {
+  const MIN_SESSION_SEC = 60; // 리포트 생성 최소 시청 시간 (1분)
+
+  const handleEndSession = async (force = false) => {
+    if (isEndingRef.current) return;
+    isEndingRef.current = true;
+
     analysis.stopAnalysis();
     webcam.stop();
     if (playerRef.current && playerReadyRef.current) {
       playerRef.current.pauseVideo();
     }
+
     const sid = sessionIdRef.current;
-    if (sid) {
-      try {
-        await sessionAPI.end(sid);
+    const watched = playerRef.current?.getCurrentTime?.() ?? elapsedRef.current;
+    sessionIdRef.current = null;
+    setSessionStarted(false);
+
+    try {
+      if (sid) await sessionAPI.end(sid);
+      if (sid && (watched >= MIN_SESSION_SEC || force)) {
         navigate(`/student/report/${sid}`);
-        return;
-      } catch (_) {}
+      } else {
+        navigate('/student');
+      }
+    } catch (_) {
+      navigate('/student');
+    } finally {
+      isEndingRef.current = false;
     }
-    navigate('/parent');
   };
 
-  const handleLectureSelect = (lec) => {
-    analysis.stopAnalysis();
-    webcam.stop();
+  // handleEndSession을 ref에 등록 (YouTube onStateChange 콜백에서 접근)
+  handleEndSessionRef.current = handleEndSession;
+
+  const handleLectureSelect = async (lec) => {
+    if (sessionStarted) {
+      await handleEndSession();
+    } else {
+      analysis.stopAnalysis();
+      webcam.stop();
+    }
     setSelectedLecture(lec);
     setSessionStarted(false);
     setElapsed(0);
@@ -326,7 +378,6 @@ const StudentDashboard = () => {
     setTabWarning(false);
     setDepartureCount(0);
     setYtCurrentTime(0);
-    sessionIdRef.current = null;
   };
 
   const status = STATUS_MAP[focusStatus];
@@ -395,10 +446,8 @@ const StudentDashboard = () => {
               <div className="filled-bar" style={{ width: `${progressPct}%` }}></div>
             </div>
             <div className="control-actions">
-              {sessionStarted && (
-                <button className="end-btn" onClick={handleEndSession}>
-                  세션 종료 · 리포트 확인 →
-                </button>
+              {sessionStarted && elapsed >= MIN_SESSION_SEC && (
+                <span className="session-hint">영상이 끝나면 리포트가 자동 생성됩니다</span>
               )}
             </div>
           </div>
