@@ -46,8 +46,7 @@ ${subtitleText}
   return JSON.parse(jsonMatch[0]);
 }
 
-const STATUS_LABEL = { 1: '집중+흥미', 2: '집중+차분', 3: '비집중', 4: '지루함', 5: '졸음' };
-const STATUS_TO_FOCUS = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
+const { STATUS_LABEL, calcFocus } = require('./constants');
 
 /**
  * 세션 집중도 데이터 + 강좌 자막/구간 정보를 결합하여
@@ -74,7 +73,7 @@ async function generateRagReport(sessionData, lectureSegments, lectureTitle) {
     const d = new Date(r.timestamp);
     const key = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     if (!byMinute[key]) byMinute[key] = [];
-    byMinute[key].push(STATUS_TO_FOCUS[r.status] || 50);
+    byMinute[key].push(calcFocus(r.status, r.confidence));
   }
   const timelineText = Object.entries(byMinute)
     .map(([t, vals]) => `${t}: ${Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)}%`)

@@ -4,7 +4,7 @@ const Lecture = require('../models/Lecture');
 const Parent = require('../models/Parent');
 const { generateRuleBasedTips, buildChartData } = require('../utils/reportGenerator');
 const { generateRagReport } = require('../utils/aiService');
-const STATUS_TO_FOCUS = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
+const { calcFocus } = require('../utils/constants');
 
 // JWT의 childStudentIds를 신뢰하지 않고 DB에서 현재 상태를 조회
 // 학생이 연결 해제 후에도 기존 토큰으로 세션에 접근하는 권한 잔류 문제를 방지
@@ -26,7 +26,7 @@ async function hasSessionAccess(user, session) {
 function calcAvgFocus(records) {
   if (!records || records.length === 0) return 0;
   return Math.round(
-    records.reduce((sum, r) => sum + (STATUS_TO_FOCUS[r.status] || 50), 0) / records.length
+    records.reduce((sum, r) => sum + calcFocus(r.status, r.confidence), 0) / records.length
   );
 }
 

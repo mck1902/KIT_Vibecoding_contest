@@ -1,4 +1,4 @@
-const STATUS_TO_FOCUS = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
+const { calcFocus } = require('./constants');
 
 /**
  * 세션 데이터를 기반으로 규칙 기반 AI 코칭 팁 생성
@@ -56,7 +56,7 @@ function buildChartData(records) {
     const d = new Date(r.timestamp);
     const key = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     if (!byMinute[key]) byMinute[key] = [];
-    byMinute[key].push(STATUS_TO_FOCUS[r.status] || 50);
+    byMinute[key].push(calcFocus(r.status, r.confidence));
   }
 
   return Object.entries(byMinute).map(([time, vals]) => ({
