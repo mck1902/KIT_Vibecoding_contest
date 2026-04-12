@@ -461,7 +461,15 @@ const StudentDashboard = () => {
 
     try {
       let endData = null;
-      if (sid) endData = await sessionAPI.end(sid);
+      if (sid) {
+        // PUT /end 실패 시 1회 재시도 (네트워크 순단 대비)
+        try {
+          endData = await sessionAPI.end(sid);
+        } catch (_) {
+          await new Promise(r => setTimeout(r, 1500));
+          endData = await sessionAPI.end(sid);
+        }
+      }
       // 포인트 획득 시 축하 모달 표시 후 리포트로 이동
       if (endData?.pointEarned > 0) {
         setEarnedPoints(endData.pointEarned);
@@ -482,6 +490,7 @@ const StudentDashboard = () => {
         navigate('/student');
       }
     } catch (_) {
+      // 재시도 후에도 실패 — endTime 미저장 상태로 이동 (어쩔 수 없는 케이스)
       navigate('/student');
     } finally {
       isEndingRef.current = false;
@@ -586,6 +595,19 @@ const StudentDashboard = () => {
         </div>
 
         <div className="sidebar-section">
+          <div className="session-stats glass">
+            <div className="stat-item">
+              <span className="stat-label">탭 이탈</span>
+              <span className="stat-value" style={{ color: departureCount > 0 ? '#f59e0b' : 'var(--text-main)' }}>
+                {departureCount}회
+              </span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">경과 시간</span>
+              <span className="stat-value">{formatTime(elapsed)}</span>
+            </div>
+          </div>
+
           <div className="webcam-box glass">
             <div className="cam-placeholder">
               {webcam.isActive ? (
@@ -647,19 +669,6 @@ const StudentDashboard = () => {
                 )}
               </div>
             )}
-          </div>
-
-          <div className="session-stats glass">
-            <div className="stat-item">
-              <span className="stat-label">탭 이탈</span>
-              <span className="stat-value" style={{ color: departureCount > 0 ? '#f59e0b' : 'var(--text-main)' }}>
-                {departureCount}회
-              </span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">경과 시간</span>
-              <span className="stat-value">{formatTime(elapsed)}</span>
-            </div>
           </div>
 
           {targetRate !== null && (
