@@ -5,6 +5,7 @@ const recordSchema = new mongoose.Schema(
     timestamp: { type: Date, required: true },
     status: { type: Number, required: true, min: 1, max: 5 },
     confidence: { type: Number, default: 0, min: 0, max: 1 },
+    focusProb: { type: Number, default: null, min: 0, max: 100 },
   },
   { _id: false }
 );

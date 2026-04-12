@@ -80,7 +80,7 @@ export default function useAttentionAnalysis(captureFrame, isWebcamActive) {
       const topLeft = face.topLeft;
       const bottomRight = face.bottomRight;
 
-      const { status, conf } = tf.tidy(() => {
+      const { status, conf, focusProb } = tf.tidy(() => {
         const full = tf.browser.fromPixels(imageData);
         const [imgH, imgW] = full.shape;
 
@@ -114,17 +114,15 @@ export default function useAttentionAnalysis(captureFrame, isWebcamActive) {
           }
         }
 
-        return { status: maxIdx + 1, conf: maxVal };
+        // 집중 클래스(status 1, 2) 확률 합산 → 집중도 (0~100)
+        const fp = Math.round((probs[0] + probs[1]) * 100);
+
+        return { status: maxIdx + 1, conf: maxVal, focusProb: fp };
       });
 
       setCurrentStatus(status);
       setConfidence(conf);
-
-      // confidence를 focusLevel(0~100)로 변환
-      const levelMap = { 1: 95, 2: 80, 3: 55, 4: 35, 5: 15 };
-      const baseLevel = levelMap[status];
-      const adjusted = Math.round(baseLevel + (conf - 0.5) * 20);
-      setFocusLevel(Math.min(100, Math.max(0, adjusted)));
+      setFocusLevel(Math.min(100, Math.max(0, focusProb)));
     } catch (err) {
       console.error('추론 오류:', err);
     }

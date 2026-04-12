@@ -29,7 +29,7 @@ async function hasSessionAccess(user, session) {
 function calcAvgFocus(records) {
   if (!records || records.length === 0) return 0;
   return Math.round(
-    records.reduce((sum, r) => sum + calcFocus(r.status, r.confidence), 0) / records.length
+    records.reduce((sum, r) => sum + calcFocus(r.status, r.confidence, r.focusProb), 0) / records.length
   );
 }
 

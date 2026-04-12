@@ -47,6 +47,7 @@ const StudentDashboard = () => {
   const sessionIdRef = useRef(null);
   const focusStatusRef = useRef(1);
   const focusLevelRef = useRef(85);
+  const focusConfidenceRef = useRef(0.5);
   const tabLeaveTimeRef = useRef(null);
   const lastValidTimeRef = useRef(0);
   const lastCheckTimeRef = useRef(Date.now());
@@ -61,11 +62,13 @@ const StudentDashboard = () => {
   // AI 분석 결과를 refs에 동기화 (백엔드 전송용)
   const focusStatus = tabWarning ? 4 : analysis.currentStatus;
   const focusLevel = tabWarning ? 45 : analysis.focusLevel;
+  const focusConfidence = tabWarning ? 0.5 : analysis.confidence;
 
   useEffect(() => {
     focusStatusRef.current = focusStatus;
     focusLevelRef.current = focusLevel;
-  }, [focusStatus, focusLevel]);
+    focusConfidenceRef.current = focusConfidence;
+  }, [focusStatus, focusLevel, focusConfidence]);
 
   // sessionStarted 및 handleEndSession을 ref에 동기화 (YouTube 콜백에서 사용)
   useEffect(() => {
@@ -174,17 +177,17 @@ const StudentDashboard = () => {
     const interval = setInterval(async () => {
       if (!sessionIdRef.current) return;
       const currentStatus = focusStatusRef.current;
-      const conf = focusLevelRef.current / 100;
+      const currentFocusProb = focusLevelRef.current;
       try {
         await sessionAPI.addRecords(sessionIdRef.current, [{
           timestamp: new Date().toISOString(),
           status: currentStatus,
-          confidence: conf,
+          confidence: focusConfidenceRef.current,
+          focusProb: currentFocusProb,
         }]);
       } catch (_) {}
-      // 누적 집중률 갱신 (calcFocus와 동일: base * conf + 50 * (1-conf))
-      const base = STATUS_TO_FOCUS[currentStatus] || 50;
-      const score = Math.round(base * conf + 50 * (1 - conf));
+      // 누적 집중률 갱신 (백엔드 calcFocus와 동일: focusProb 우선, 없으면 status 기반)
+      const score = Math.round(currentFocusProb);
       focusSumRef.current += score;
       recordCountRef.current += 1;
       setCumulativeFocus(Math.round(focusSumRef.current / recordCountRef.current));
