@@ -690,21 +690,6 @@ const StudentDashboard = () => {
             </div>
           )}
 
-          {user?.inviteCode && (
-            <div className="invite-code-card glass">
-              <h3 className="invite-code-title">내 초대 코드</h3>
-              <div className="invite-code-row">
-                <span className="invite-code-value">{user.inviteCode}</span>
-                <button
-                  className="invite-copy-btn"
-                  onClick={() => navigator.clipboard.writeText(user.inviteCode).then(() => alert('복사되었습니다.'))}
-                >
-                  복사
-                </button>
-              </div>
-              <p className="invite-code-hint">학부모에게 이 코드를 알려주세요.</p>
-            </div>
-          )}
         </div>
       </div>
 
