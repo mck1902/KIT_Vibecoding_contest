@@ -381,6 +381,14 @@ const StudentDashboard = () => {
         if (analysis.isModelLoaded) {
           analysis.startAnalysis();
         }
+      }).catch(() => {
+        // 웹캠 시작 실패 시 세션 종료
+        alert('카메라를 시작할 수 없습니다. 카메라 권한을 확인해주세요.');
+        sessionIdRef.current = null;
+        setSessionStarted(false);
+        if (playerRef.current && playerReadyRef.current) {
+          playerRef.current.pauseVideo();
+        }
       });
     } else {
       analysis.stopAnalysis();
@@ -416,8 +424,14 @@ const StudentDashboard = () => {
     try {
       const data = await sessionAPI.start(selectedLecture.id, selectedLecture.subject);
       sessionIdRef.current = data._id || null;
+      if (!sessionIdRef.current) {
+        alert('세션을 시작할 수 없습니다. 다시 시도해주세요.');
+        return;
+      }
     } catch (_) {
       sessionIdRef.current = null;
+      alert('서버 연결에 실패했습니다. 네트워크를 확인해주세요.');
+      return;
     }
 
     // 포인트 설정 로드 (세션 시작 시 최신값 갱신)
