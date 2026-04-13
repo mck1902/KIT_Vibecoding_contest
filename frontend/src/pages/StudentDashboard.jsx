@@ -549,7 +549,7 @@ const StudentDashboard = () => {
 
       <header className="student-header">
         <h2>{selectedLecture.title}</h2>
-        <p className="subtitle">{selectedLecture.episode} · 총 {selectedLecture.duration}</p>
+        <p className="subtitle">{selectedLecture.episode} · 총 {formatTime(ytDuration || selectedLecture.durationSec)}</p>
       </header>
 
       {tabWarning && (
@@ -581,7 +581,7 @@ const StudentDashboard = () => {
 
           <div className="video-controls glass">
             <span className="time-display">
-              {formatTime(ytCurrentTime || elapsed)} / {selectedLecture.duration}
+              {formatTime(ytCurrentTime || elapsed)} / {formatTime(ytDuration || selectedLecture.durationSec)}
             </span>
             <div className="control-bar">
               <div className="filled-bar" style={{ width: `${progressPct}%` }}></div>
