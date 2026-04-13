@@ -218,10 +218,12 @@ export default function SessionReport() {
       {/* 포인트 획득 결과 */}
       {sessionDetail && edupoint?.initialized && (() => {
         const goalAchieved = report.avgFocus >= edupoint.settings.targetRate;
+        const completionAchieved = (sessionDetail.completionRate ?? 0) >= 90;
         const pointsEarned = sessionDetail.pointEarned ?? 0;
-        // 달성 여부에 따라 3가지 상태: 포인트 지급 / 잔액 부족 달성 / 미달성
-        const status = goalAchieved && pointsEarned > 0 ? 'achieved'
-          : goalAchieved ? 'achieved-no-balance'
+        // 4가지 상태: 포인트 지급 / 진짜 잔액 부족 / 완강 미달 / 집중률 미달
+        const status = pointsEarned > 0 ? 'achieved'
+          : goalAchieved && completionAchieved ? 'achieved-no-balance'
+          : goalAchieved && !completionAchieved ? 'incomplete'
           : 'missed';
         return (
           <section className="sr-point-result glass">
@@ -242,7 +244,7 @@ export default function SessionReport() {
                   </span>
                 </div>
               </div>
-              <div className={`sr-point-earned ${status === 'missed' ? 'missed' : 'achieved'}`}>
+              <div className={`sr-point-earned ${status === 'missed' || status === 'incomplete' ? 'missed' : 'achieved'}`}>
                 {status === 'achieved' && (
                   <>
                     <span className="sr-point-earned-icon">&#10003;</span>
@@ -253,6 +255,12 @@ export default function SessionReport() {
                   <>
                     <span className="sr-point-earned-icon">&#10003;</span>
                     <span>목표 달성! (학부모 포인트 잔액 부족)</span>
+                  </>
+                )}
+                {status === 'incomplete' && (
+                  <>
+                    <span className="sr-point-earned-icon">&#10007;</span>
+                    <span>집중률 달성! 강의를 끝까지 시청해야 포인트가 지급됩니다 ({sessionDetail.completionRate ?? 0}% 시청)</span>
                   </>
                 )}
                 {status === 'missed' && (
