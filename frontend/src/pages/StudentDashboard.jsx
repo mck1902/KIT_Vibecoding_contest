@@ -11,10 +11,10 @@ import './StudentDashboard.css';
 
 const STATUS_MAP = {
   1: { label: '집중 + 흥미로움', color: '#22c55e' },
-  2: { label: '집중 + 차분함',   color: '#3b82f6' },
-  3: { label: '집중하지 않음',   color: '#f59e0b' },
+  2: { label: '집중 + 차분함', color: '#3b82f6' },
+  3: { label: '집중하지 않음', color: '#f59e0b' },
   4: { label: '집중하지 않음 + 지루함', color: '#f97316' },
-  5: { label: '졸음',            color: '#ef4444' },
+  5: { label: '졸음', color: '#ef4444' },
 };
 
 // 백엔드 calcFocus와 동일한 가중치 매핑 (누적 집중률 계산용)
@@ -92,7 +92,7 @@ const StudentDashboard = () => {
             setStudentEarned(data.studentEarned ?? 0);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, []);
 
@@ -134,7 +134,7 @@ const StudentDashboard = () => {
                   resumeTime: resumeTime.toISOString(),
                   duration,
                   videoTime: Math.round((pauseVideoTimeRef.current || 0) * 10) / 10,
-                }).catch(() => {});
+                }).catch(() => { });
               }
               pauseStartRef.current = null;
               pauseVideoTimeRef.current = null;
@@ -196,7 +196,7 @@ const StudentDashboard = () => {
             setYtCurrentTime(t);
             ytCurrentTimeRef.current = t;
           }
-        } catch (_) {}
+        } catch (_) { }
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -209,7 +209,7 @@ const StudentDashboard = () => {
     const batch = recordBufferRef.current.splice(0);
     try {
       await sessionAPI.addRecords(sessionIdRef.current, batch);
-    } catch (_) {}
+    } catch (_) { }
     // 누적 집중률 갱신 (백엔드 calcFocus와 동일: focusProb 우선, 없으면 status 가중치)
     for (const r of batch) {
       const base = STATUS_TO_FOCUS[r.status] || 50;
@@ -293,7 +293,7 @@ const StudentDashboard = () => {
           returnTime: returnTime.toISOString(),
           duration,
         });
-      } catch (_) {}
+      } catch (_) { }
     }
     tabLeaveTimeRef.current = null;
     setTimeout(() => {
@@ -632,8 +632,8 @@ const StudentDashboard = () => {
               <span className="live-dot" style={{ background: sessionStarted ? (tabWarning ? '#ef4444' : analysis.faceDetected ? '#22c55e' : '#f59e0b') : '#64748b' }}></span>
               {webcam.error ? webcam.error
                 : analysis.modelLoadingProgress ? analysis.modelLoadingProgress
-                : sessionStarted ? (tabWarning ? '집중도 하락 기록 중' : analysis.isAnalyzing ? `On-Device AI 분석 중 (${Math.round(analysis.confidence * 100)}%)` : '분석 준비 중...')
-                : '대기 중'}
+                  : sessionStarted ? (tabWarning ? '집중도 하락 기록 중' : analysis.isAnalyzing ? `On-Device AI 분석 중 (${Math.round(analysis.confidence * 100)}%)` : '분석 준비 중...')
+                    : '대기 중'}
             </div>
           </div>
 
