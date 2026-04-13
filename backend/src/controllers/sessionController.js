@@ -26,10 +26,30 @@ async function hasSessionAccess(user, session) {
   return false;
 }
 
-function calcAvgFocus(records) {
+/**
+ * 일시정지 기간의 레코드를 제외한 평균 집중도 계산
+ * pauseEvents가 없으면 전체 레코드를 사용
+ */
+function calcAvgFocus(records, pauseEvents = []) {
   if (!records || records.length === 0) return 0;
+
+  let filtered = records;
+  if (pauseEvents.length > 0) {
+    const pauseRanges = pauseEvents
+      .filter(p => p.pauseTime && p.resumeTime)
+      .map(p => [new Date(p.pauseTime).getTime(), new Date(p.resumeTime).getTime()]);
+
+    if (pauseRanges.length > 0) {
+      filtered = records.filter(r => {
+        const t = new Date(r.timestamp).getTime();
+        return !pauseRanges.some(([start, end]) => t >= start && t <= end);
+      });
+    }
+  }
+
+  if (filtered.length === 0) return 0;
   return Math.round(
-    records.reduce((sum, r) => sum + calcFocus(r.status, r.confidence, r.focusProb), 0) / records.length
+    filtered.reduce((sum, r) => sum + calcFocus(r.status, r.confidence, r.focusProb), 0) / filtered.length
   );
 }
 
@@ -213,7 +233,7 @@ async function endSession(req, res) {
 
     // 세션 종료 처리
     const endTime = new Date();
-    const focusRate = calcAvgFocus(session.records);
+    const focusRate = calcAvgFocus(session.records, session.pauseEvents);
     await session.updateOne({ endTime, focusRate });
 
     // 포인트 지급 시도
@@ -331,13 +351,13 @@ async function getSessionReport(req, res) {
 
     // endSession에서 저장한 focusRate를 우선 사용 (에듀포인트 비교값과 일치 보장)
     // 세션 진행 중(미종료) 또는 구버전 데이터는 records로 재계산
-    const avgFocus = session.focusRate ?? calcAvgFocus(session.records);
+    const avgFocus = session.focusRate ?? calcAvgFocus(session.records, session.pauseEvents);
     const tips = generateRuleBasedTips({
       records: session.records,
       departures: session.departures,
       avgFocus,
     });
-    const chartData = buildChartData(session.records);
+    const chartData = buildChartData(session.records, session.pauseEvents);
     const totalSec = session.endTime
       ? Math.round((new Date(session.endTime) - new Date(session.startTime)) / 1000)
       : 0;
@@ -383,7 +403,7 @@ async function getRagAnalysis(req, res) {
       return res.status(400).json({ message: '강좌 자막 분석이 완료되지 않았습니다. 먼저 /api/lectures/:id/analyze를 호출하세요.' });
     }
 
-    const avgFocus = calcAvgFocus(session.records);
+    const avgFocus = calcAvgFocus(session.records, session.pauseEvents);
     // 이미 생성된 분석이 있으면 캐시 반환 (AI API 재호출 방지)
     if (session.ragAnalysis) {
       return res.status(200).json({ ragAnalysis: session.ragAnalysis, cached: true });
