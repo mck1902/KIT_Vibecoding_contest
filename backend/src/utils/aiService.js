@@ -5,7 +5,35 @@ function getOpenAIClient() {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY가 설정되지 않았습니다. backend/.env를 확인하세요.');
   }
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 30000 });
+}
+
+/**
+ * OpenAI API 호출을 재시도하는 래퍼
+ * @param {Function} fn - async 함수 (API 호출)
+ * @param {number} maxRetries - 최대 재시도 횟수 (기본 2)
+ * @param {number} baseDelay - 첫 재시도 대기 시간 ms (기본 1000)
+ */
+async function withRetry(fn, maxRetries = 2, baseDelay = 1000) {
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (error.status === 401 || error.status === 400) {
+        throw error;
+      }
+      const delay = error.status === 429
+        ? baseDelay * Math.pow(2, attempt) * 2
+        : baseDelay * Math.pow(2, attempt);
+      if (attempt < maxRetries) {
+        console.warn(`[OpenAI] 요청 실패 (시도 ${attempt + 1}/${maxRetries + 1}), ${delay}ms 후 재시도...`, error.message || '');
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
 }
 
 /**
@@ -14,7 +42,7 @@ function getOpenAIClient() {
 async function analyzeLectureContent(subtitleText, lectureTitle) {
   const client = getOpenAIClient();
 
-  const response = await client.chat.completions.create({
+  const response = await withRetry(() => client.chat.completions.create({
     model: 'gpt-4o-mini',
     max_tokens: 1024,
     temperature: 0.3,
@@ -38,7 +66,7 @@ ${subtitleText}
 }`,
       },
     ],
-  });
+  }));
 
   const text = response.choices[0].message.content;
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -473,7 +501,7 @@ ${videoTimelineText || '데이터 없음 (videoTime 미수집 세션)'}
 
 위 데이터를 기반으로 5개 섹션으로 리포트를 작성해주세요. 이탈은 외부 요인, 집중도 하락은 학습 태도로 명확히 구분하여 분석하세요.`;
 
-  const response = await client.chat.completions.create({
+  const response = await withRetry(() => client.chat.completions.create({
     model: 'gpt-4o-mini',
     max_tokens: 1500,
     temperature: 0.5,
@@ -481,7 +509,7 @@ ${videoTimelineText || '데이터 없음 (videoTime 미수집 세션)'}
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
-  });
+  }));
 
   return response.choices[0].message.content.trim();
 }
