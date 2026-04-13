@@ -249,3 +249,8 @@
   background: var(--primary);
   color: #fff;
 }
+
+/* ── 퀴즈 결과 카드 ── */
+.quiz-result-card {
+  min-height: 120px;
+}

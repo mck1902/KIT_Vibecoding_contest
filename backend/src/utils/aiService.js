@@ -514,4 +514,68 @@ ${videoTimelineText || '데이터 없음 (videoTime 미수집 세션)'}
   return response.choices[0].message.content.trim();
 }
 
-module.exports = { analyzeLectureContent, generateRagReport };
+/**
+ * 저집중 구간의 자막/세그먼트를 기반으로 복습 퀴즈(객관식 3문제) 자동 생성
+ */
+async function generateQuiz(subtitleText, segments, lectureTitle, subject) {
+  const client = getOpenAIClient();
+
+  const segmentInfo = segments
+    .map(s => `${s.start}~${s.end} [${s.topic}] 키워드: ${(s.keywords || []).join(', ')}`)
+    .join('\n');
+
+  const response = await withRetry(() => client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    max_tokens: 1024,
+    temperature: 0.5,
+    messages: [
+      {
+        role: 'system',
+        content: '당신은 교육 콘텐츠 기반 퀴즈 출제 전문가입니다. 반드시 JSON 형식으로만 응답하세요.',
+      },
+      {
+        role: 'user',
+        content: `다음은 "${lectureTitle}" (${subject}) 강의에서 학생이 집중하지 못한 구간입니다.
+이 구간의 핵심 개념을 확인하는 객관식 퀴즈 3문제를 생성해주세요.
+
+[구간 정보]
+${segmentInfo}
+
+[해당 구간 자막]
+${subtitleText}
+
+아래 JSON 형식으로만 응답해주세요 (다른 텍스트 없이):
+{
+  "questions": [
+    {
+      "question": "문제 텍스트",
+      "options": ["선택지A", "선택지B", "선택지C", "선택지D"],
+      "answer": 0,
+      "explanation": "정답 해설"
+    }
+  ]
+}`,
+      },
+    ],
+  }));
+
+  const text = response.choices[0].message.content;
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('OpenAI API 응답에서 JSON을 파싱할 수 없습니다.');
+  const parsed = JSON.parse(jsonMatch[0]);
+
+  if (!parsed.questions || !Array.isArray(parsed.questions) || parsed.questions.length === 0) {
+    throw new Error('퀴즈 생성 결과가 유효하지 않습니다.');
+  }
+  for (const q of parsed.questions) {
+    if (!q.question || !Array.isArray(q.options) || q.options.length !== 4
+        || typeof q.answer !== 'number' || q.answer < 0 || q.answer > 3
+        || !q.explanation) {
+      throw new Error('퀴즈 문제 형식이 유효하지 않습니다.');
+    }
+  }
+
+  return parsed.questions.slice(0, 3);
+}
+
+module.exports = { analyzeLectureContent, generateRagReport, generateQuiz };

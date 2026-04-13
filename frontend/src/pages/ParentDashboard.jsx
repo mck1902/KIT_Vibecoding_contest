@@ -35,6 +35,8 @@ const ParentDashboard = () => {
   const [ragText, setRagText] = useState('');
   const [ragLoading, setRagLoading] = useState(false);
   const [ragError, setRagError] = useState('');
+  const [quizData, setQuizData] = useState(null);
+  const [quizLoading, setQuizLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [edupoint, setEdupoint] = useState(null);
   const [edupointRefresh, setEdupointRefresh] = useState(0);
@@ -84,6 +86,16 @@ const ParentDashboard = () => {
       .finally(() => setRagLoading(false));
   }, [selectedSessionId]);
 
+  // 퀴즈 조회
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    setQuizLoading(true);
+    sessionAPI.getQuiz(selectedSessionId)
+      .then(data => setQuizData(data.quiz))
+      .catch(() => setQuizData(null))
+      .finally(() => setQuizLoading(false));
+  }, [selectedSessionId]);
+
   // 에듀포인트 데이터 로딩
   useEffect(() => {
     const sid = selectedChild?.studentId || (children.length === 1 ? children[0].studentId : null);
@@ -118,6 +130,7 @@ const ParentDashboard = () => {
     setSelectedChild(child);
     setReport(null);
     setRagText('');
+    setQuizData(null);
     const target = child
       ? sessions.filter(s => s.studentId === child.studentId)
       : sessions;
@@ -133,6 +146,7 @@ const ParentDashboard = () => {
     setStatusFilter(status);
     setReport(null);
     setRagText('');
+    setQuizData(null);
     const filtered = childSessions.filter(s =>
       status === 'ended' ? !!s.endTime : !s.endTime
     );
@@ -406,6 +420,36 @@ const ParentDashboard = () => {
               </p>
             )}
           </div>
+
+          {/* 퀴즈 결과 */}
+          {quizLoading ? (
+            <div className="report-card glass">
+              <div className="card-header"><span className="badge">복습 퀴즈</span></div>
+              <p style={{ color: 'var(--text-muted)' }}>불러오는 중...</p>
+            </div>
+          ) : quizData ? (
+            <div className="report-card glass quiz-result-card">
+              <div className="card-header">
+                <span className="badge" style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' }}>복습 퀴즈</span>
+              </div>
+              {quizData.results?.completedAt ? (
+                <>
+                  <div style={{ fontSize: '1.7rem', fontWeight: 700, color: quizData.results.score === quizData.results.total ? '#22c55e' : quizData.results.score >= quizData.results.total / 2 ? '#f59e0b' : '#ef4444' }}>
+                    {quizData.results.score}/{quizData.results.total} 정답
+                  </div>
+                  <div style={{ marginTop: '0.5rem' }}>
+                    {quizData.questions?.map((q, i) => (
+                      <p key={i} style={{ color: quizData.results.answers[i] === q.answer ? '#22c55e' : '#ef4444', fontSize: '0.9rem' }}>
+                        Q{i+1}. {quizData.results.answers[i] === q.answer ? '✅ 정답' : `❌ 오답 → 정답: ${q.options[q.answer]}`}
+                      </p>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p style={{ color: 'var(--text-muted)' }}>학생이 아직 퀴즈를 풀지 않았습니다.</p>
+              )}
+            </div>
+          ) : null}
         </section>
     </div>
   );

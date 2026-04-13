@@ -1,0 +1,224 @@
+/* src/components/quiz/QuizSection.css */
+
+/* ── 퀴즈 섹션 카드 ── */
+.sr-quiz-section {
+  padding: 1.4rem;
+  border-radius: 14px;
+  margin-top: 2rem;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.04), transparent);
+}
+
+/* ── 헤더 ── */
+.sr-quiz-header {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.sr-quiz-header h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sr-quiz-badge {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.sr-quiz-score {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-left: 0.3rem;
+}
+
+/* ── 안내 텍스트 ── */
+.sr-quiz-desc {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 1.2rem;
+}
+
+/* ── 로딩 ── */
+.sr-quiz-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+/* ── 에러 ── */
+.sr-quiz-error {
+  color: #ef4444;
+  font-size: 0.85rem;
+  margin-top: 0.8rem;
+}
+
+/* ── 폴백 안내 ── */
+.sr-quiz-fallback-notice {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+/* ── 버튼 ── */
+.sr-quiz-generate-btn,
+.sr-quiz-submit-btn {
+  margin-top: 0.5rem;
+}
+
+.sr-quiz-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── 문제 목록 ── */
+.sr-quiz-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 1.2rem;
+}
+
+.sr-quiz-question {
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.sr-quiz-question:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.sr-quiz-question-text {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-bottom: 0.8rem;
+  color: var(--text-main);
+}
+
+/* ── 선택지 ── */
+.sr-quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.sr-quiz-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.sr-quiz-option.selectable {
+  cursor: pointer;
+}
+
+.sr-quiz-option.selectable:hover {
+  background: rgba(59, 130, 246, 0.06);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.sr-quiz-option.selectable.selected {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+}
+
+.sr-quiz-option-label {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  width: 1.4rem;
+  flex-shrink: 0;
+}
+
+/* ── 결과 상태 선택지 ── */
+.sr-quiz-option.result.correct {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.sr-quiz-option.result.wrong {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+/* ── 정답/오답 레이블 ── */
+.sr-quiz-result-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.sr-quiz-result-label.correct {
+  color: #22c55e;
+}
+
+.sr-quiz-result-label.wrong {
+  color: #ef4444;
+}
+
+/* ── 해설 ── */
+.sr-quiz-explanation {
+  margin-top: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-main);
+}
+
+.sr-quiz-explanation strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.82rem;
+  color: #ef4444;
+}
+
+.sr-quiz-explanation p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* ── 반응형 ── */
+@media (max-width: 800px) {
+  .sr-quiz-section {
+    margin-top: 1.5rem;
+    padding: 1.2rem 1rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .sr-quiz-option {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.84rem;
+  }
+}

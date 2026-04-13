@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { sessionAPI, edupointAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import QuizSection from '../components/quiz/QuizSection';
 import './SessionReport.css';
 
 const FOCUS_COLOR = (pct) => {
@@ -42,6 +43,9 @@ export default function SessionReport() {
   const [ragLoading, setRagLoading] = useState(true);
   const [ragError, setRagError] = useState(null);
 
+  const [quiz, setQuiz] = useState(null);
+  const [quizLoading, setQuizLoading] = useState(true);
+
   const [sessionDetail, setSessionDetail] = useState(null);
   const [edupoint, setEdupoint] = useState(null);
 
@@ -60,6 +64,12 @@ export default function SessionReport() {
       .then((data) => setRagText(data.ragAnalysis))
       .catch((err) => setRagError(err.message))
       .finally(() => setRagLoading(false));
+
+    // 퀴즈 조회
+    sessionAPI.getQuiz(sessionId)
+      .then((data) => setQuiz(data.quiz))
+      .catch(() => setQuiz(null))
+      .finally(() => setQuizLoading(false));
 
     // 세션 상세 (포인트 정보 포함)
     sessionAPI.getById(sessionId)
@@ -306,6 +316,17 @@ export default function SessionReport() {
           )}
         </section>
       </div>
+
+      {/* 복습 퀴즈 */}
+      {!quizLoading && (
+        <QuizSection
+          sessionId={sessionId}
+          quiz={quiz}
+          userRole={isParent ? 'parent' : 'student'}
+          onQuizGenerated={(q) => setQuiz(q)}
+          onQuizSubmitted={(q) => setQuiz(q)}
+        />
+      )}
 
       {/* 하단 액션 버튼 */}
       <div className="sr-footer-actions">

@@ -21,7 +21,7 @@
 ### 전제 조건
 - 강의에 자막(`Lecture.subtitleText`)이 있고, 분석 완료(`Lecture.analyzed === true`, `Lecture.segments` 존재)
 - 세션에 충분한 집중도 레코드(`Session.records`)가 존재
-- OpenAI API 키 설정 (기존 `claudeService.js`가 OpenAI `gpt-4o-mini` 사용 중)
+- OpenAI API 키 설정 (기존 `aiService.js`가 OpenAI `gpt-4o-mini` 사용 중)
 
 ---
 
@@ -80,11 +80,12 @@ Session, Lecture 모델은 수정하지 않는다.
 
 기존 `hasSessionAccess()` 함수 재사용:
 ```javascript
-// sessionController.js에 이미 존재 (line 6~24)
+// sessionController.js에 이미 존재 (line 20~27) + 이미 export됨 (line 497)
 // 학생: session.studentId === req.user.studentId
 // 학부모: Parent.children에 해당 학생의 ObjectId가 포함되어 있는지 DB 조회
 ```
 퀴즈 API는 세션 소유권 검증을 세션 기반으로 수행한다. 별도 권한 함수 불필요.
+`quizController.js`에서 `require('./sessionController').hasSessionAccess`로 바로 사용.
 
 ---
 
@@ -134,58 +135,24 @@ function findLowFocusSegments(records, segments) {
 
 #### records와 segments의 시간 매칭 — 구현 수준 설계
 
-##### 문제: 현재 record에 재생 위치 정보가 없음
+##### 현재 상태: record에 `videoTime` 필드 이미 존재
 
 ```
 현재 record 구조 (Session.records):
-  { timestamp: Date, status: 1~5, confidence: 0~1 }
+  { timestamp: Date, status: 1~5, confidence: 0~1, focusProb: 0~100, videoTime: Number|null }
 
 segments 구조 (Lecture.segments):
   { start: "05:00", end: "10:00", topic: "...", keywords: [...] }
 
-timestamp는 "언제 판정했는지"(벽시계)이지 "강의 몇 초 시점의 판정인지"가 아니다.
-session.startTime 기반 경과 시간 계산은 일시정지, 탭 이탈, seek가 있으면 틀어진다.
+videoTime은 "강의 몇 초 시점의 판정인지"를 나타낸다.
+프론트엔드 StudentDashboard.jsx에서 ytCurrentTimeRef를 통해
+record 전송 시 videoTime을 이미 포함하고 있다.
+Session 모델과 validate.js의 addRecords 스키마에도 이미 정의되어 있다.
+→ 추가 수정 없이 바로 사용 가능.
 ```
 
-##### 해결: record에 `playbackSec` 필드 추가
+##### 매칭 로직 — videoTime 기반
 
-프론트엔드 `StudentDashboard.jsx`에는 이미 `ytCurrentTime` 상태가 있다 (line 28).
-YouTube Player의 `getCurrentTime()`으로 1초마다 갱신되고 있고, seek 방지 로직(line 141)도 있다.
-이 값을 record 전송 시 함께 보내면 "이 판정은 강의 몇 초 시점에서 내려졌는지"를 정확히 알 수 있다.
-
-##### 수정 범위
-
-**1. Session 모델 — recordSchema에 필드 추가**
-```javascript
-// backend/src/models/Session.js
-const recordSchema = new mongoose.Schema({
-  timestamp: { type: Date, required: true },
-  status: { type: Number, required: true, min: 1, max: 5 },
-  confidence: { type: Number, default: 0, min: 0, max: 1 },
-  playbackSec: { type: Number, default: null },  // 강의 재생 위치 (초). null이면 구버전 데이터
-}, { _id: false });
-```
-
-**2. 프론트엔드 — record 전송 시 ytCurrentTime 포함**
-```javascript
-// StudentDashboard.jsx line 160 수정
-await sessionAPI.addRecords(sessionIdRef.current, [{
-  timestamp: new Date().toISOString(),
-  status: focusStatusRef.current,
-  confidence: focusLevelRef.current / 100,
-  playbackSec: Math.floor(ytCurrentTimeRef.current),  // 추가
-}]);
-```
-
-> **주의:** 현재 `ytCurrentTime`은 `useState`이므로 `setInterval` 콜백에서 최신 값을 참조하려면
-> `useRef`로 동기화해야 한다. 기존 `focusStatusRef`, `focusLevelRef`와 동일한 패턴.
-> ```javascript
-> const ytCurrentTimeRef = useRef(0);
-> // ytCurrentTime 갱신 시 ref도 동기화
-> useEffect(() => { ytCurrentTimeRef.current = ytCurrentTime; }, [ytCurrentTime]);
-> ```
-
-**3. 매칭 로직 — playbackSec 기반**
 ```javascript
 function findLowFocusSegments(records, segments) {
   // segment.start/end를 초로 변환: "05:00" → 300
@@ -200,7 +167,7 @@ function findLowFocusSegments(records, segments) {
 
     // 해당 구간에 속하는 records 필터
     const matched = records.filter(r =>
-      r.playbackSec != null && r.playbackSec >= segStart && r.playbackSec < segEnd
+      r.videoTime != null && r.videoTime >= segStart && r.videoTime < segEnd
     );
 
     // 구간별 평균 집중도
@@ -216,13 +183,13 @@ function findLowFocusSegments(records, segments) {
 }
 ```
 
-**4. 구버전 데이터 폴백 (playbackSec === null)**
+##### 구버전 데이터 폴백 (videoTime === null)
 
-`playbackSec`가 없는 기존 세션 데이터에 대해서는 균등 분할 폴백을 적용한다:
+`videoTime`이 없는 기존 세션 데이터에 대해서는 균등 분할 폴백을 적용한다:
 
 ```javascript
 function findLowFocusSegmentsFallback(records, segments, sessionStartTime) {
-  // playbackSec가 하나도 없으면 폴백
+  // videoTime이 하나도 없으면 폴백
   // session.startTime 기반 경과 시간으로 추정 (부정확할 수 있음)
   // departures 시간을 빼서 보정 시도
 }
@@ -257,22 +224,10 @@ function findLowFocusSegmentsFallback(records, segments, sessionStartTime) {
 | 톤 | 경고가 아닌 안내 (amber/회색, 빨강 아님). 퀴즈 자체는 정상 풀이 가능 |
 | 학부모 화면 | ParentDashboard에서는 표시 안 함 (결과만 보므로 불필요) |
 
-##### 수정 파일 목록 추가
-
-이 변경으로 인해 기존 수정 파일 목록에 추가:
-```
-backend/
-  src/models/Session.js                  # recordSchema에 playbackSec 필드 추가
-  src/middleware/validate.js             # addRecords 스키마에 playbackSec 허용
-
-frontend/
-  src/pages/StudentDashboard.jsx         # record 전송 시 ytCurrentTimeRef 포함
-```
-
 #### OpenAI API 프롬프트
 
 ```javascript
-// claudeService.js에 추가
+// aiService.js에 추가
 async function generateQuiz(subtitleText, segments, lectureTitle, subject) {
   const client = getOpenAIClient();
 
@@ -336,7 +291,7 @@ ${subtitleText}
 ```
 
 > **기존 패턴 준수:** `analyzeLectureContent`, `generateRagReport`와 동일한 구조 —
-> OpenAI 클라이언트 사용, JSON 파싱, 에러 핸들링.
+> OpenAI 클라이언트 사용, JSON 파싱, 에러 핸들링, `withRetry` 래퍼 적용.
 
 ---
 
@@ -630,18 +585,10 @@ frontend/
 ### 수정 파일
 ```
 backend/
-  src/models/Session.js                 # recordSchema에 playbackSec: Number 필드 추가
-  src/middleware/validate.js            # addRecords Zod 스키마에 playbackSec 허용
-  src/utils/claudeService.js → aiService.js  # 리네임 + generateQuiz() 추가 (아래 방침 참조)
+  src/utils/aiService.js                # generateQuiz() 함수 추가 (withRetry 래퍼 포함)
   src/routes/sessions.js                # quiz 라우트 3개 추가
-  src/controllers/sessionController.js  # hasSessionAccess를 module.exports에 추가 (현재 미export, line 255)
-  #   현재: module.exports = { createSession, endSession, addRecords, ... }
-  #   변경: module.exports = { ..., hasSessionAccess }
-  #   quizController.js에서 require하여 세션 소유권 검증에 재사용
 
 frontend/
-  src/pages/StudentDashboard.jsx        # record 전송 시 ytCurrentTimeRef.current 포함 (line 160)
-  #   ytCurrentTimeRef 추가 (useRef, ytCurrentTime 변경 시 동기화)
   src/services/api.js                   # sessionAPI에 quiz 관련 함수 3개 추가
   src/pages/SessionReport.jsx           # 하단에 QuizSection 컴포넌트 추가
   src/pages/SessionReport.css           # 퀴즈 섹션 스타일 (또는 QuizSection.css에 전부)
@@ -653,20 +600,9 @@ frontend/
 > 퀴즈는 세션에 1:1로 종속되므로 `/api/sessions/:sessionId/quiz`가 자연스럽다.
 > 별도 `/api/quiz` 라우트를 만들면 세션 권한 검증을 중복 구현해야 한다.
 
-> **claudeService.js → aiService.js 리네임 방침:**
-> 현재 `claudeService.js`는 이름과 실제 구현이 불일치한다:
-> - 파일명: `claudeService` (Claude API를 암시)
-> - 실제 코드: `const OpenAI = require('openai')` — OpenAI `gpt-4o-mini`만 사용
->
-> 퀴즈 기능 추가 시 이 파일에 `generateQuiz()`를 추가하는데,
-> "claudeService에 OpenAI 퀴즈 함수를 추가"는 혼란의 원인이 된다.
-> 이 기회에 `aiService.js`로 리네임하여 특정 벤더에 종속되지 않는 이름으로 정리한다.
->
-> **리네임 영향 범위 (2개 파일):**
-> ```
-> lectureController.js:2  — require('../utils/claudeService') → require('../utils/aiService')
-> sessionController.js:6  — require('../utils/claudeService') → require('../utils/aiService')
-> ```
+> **참고:** `claudeService.js` → `aiService.js` 리네임은 이미 완료됨.
+> `hasSessionAccess` 함수도 이미 `sessionController.js`에서 export 중.
+> `quizController.js`에서 `require('../controllers/sessionController').hasSessionAccess`로 바로 사용 가능.
 
 ---
 
@@ -774,37 +710,37 @@ backend/src/tests/quiz/
 | 여러 저집중 구간 | A: 30%, B: 45%, C: 55%, D: 90% | A, B, C 중 최대 3개 |
 | 저집중 구간 없음 (전부 고집중) | 모든 segment avg > 60% | 가장 낮은 2개 segment 반환 |
 | segment 1개만 | 1개 segment | 해당 segment 반환 |
-| playbackSec 있는 records | 정상 데이터 | playbackSec 기반으로 segment에 정확히 매칭 |
-| playbackSec 없는 구버전 records | 전부 null | 균등 분할 폴백 + UI 안내 "구간 매칭이 부정확할 수 있습니다" |
-| playbackSec 일부만 있음 | 혼재 | playbackSec 있는 records만 사용, 없는 건 무시 |
+| videoTime 있는 records | 정상 데이터 | videoTime 기반으로 segment에 정확히 매칭 |
+| videoTime 없는 구버전 records | 전부 null | 균등 분할 폴백 + UI 안내 "구간 매칭이 부정확할 수 있습니다" |
+| videoTime 일부만 있음 | 혼재 | videoTime 있는 records만 사용, 없는 건 무시 |
 
 ---
 
 ## 9. 구현 순서
 
-### Phase 0: record에 재생 위치 추가 (퀴즈 품질의 전제 조건)
-1. `Session.js` recordSchema에 `playbackSec` 필드 추가
-2. `validate.js` addRecords 스키마에 `playbackSec` 허용
-3. `StudentDashboard.jsx` — `ytCurrentTimeRef` 추가, record 전송 시 포함
+### ~~Phase 0: record에 재생 위치 추가~~ — 완료됨
+> `videoTime` 필드가 Session 모델, validate.js, StudentDashboard.jsx에 이미 구현됨.
+> `ytCurrentTimeRef`도 이미 존재. 추가 작업 없음.
 
 ### Phase 1: 백엔드
-4. `Quiz` Mongoose 모델 생성 (유니크 인덱스 포함)
-5. `claudeService.js` → `aiService.js` 리네임 + import 경로 수정 (2개 파일) + `generateQuiz()` 추가
-6. `quizController.js` — 생성, 조회, 제출 컨트롤러 + `findLowFocusSegments` (playbackSec 기반 매칭)
-7. `sessions.js` 라우트에 quiz 엔드포인트 3개 추가
-8. `sessionController.js` line 255의 `module.exports`에 `hasSessionAccess` 추가 (현재 내부 함수로만 존재)
+1. `Quiz` Mongoose 모델 생성 (유니크 인덱스 포함)
+2. `aiService.js`에 `generateQuiz()` 함수 추가 (기존 `withRetry` 래퍼 적용)
+3. `quizController.js` — 생성, 조회, 제출 컨트롤러 + `findLowFocusSegments` (videoTime 기반 매칭)
+4. `sessions.js` 라우트에 quiz 엔드포인트 3개 추가
+
+> `hasSessionAccess`는 이미 `sessionController.js`에서 export 중 — 추가 작업 없음.
 
 ### Phase 2: 프론트엔드
-9. `api.js`에 quiz API 함수 3개 추가
-10. `QuizSection.jsx` + `QuizSection.css` 컴포넌트 구현
-11. `SessionReport.jsx`에 QuizSection 통합
-12. `ParentDashboard.jsx`에 퀴즈 결과 카드 추가
+5. `api.js`에 quiz API 함수 3개 추가
+6. `QuizSection.jsx` + `QuizSection.css` 컴포넌트 구현
+7. `SessionReport.jsx`에 QuizSection 통합
+8. `ParentDashboard.jsx`에 퀴즈 결과 카드 추가
 
 ### Phase 3: 테스트
-10. 퀴즈 생성 테스트 (OpenAI mock 포함)
-11. 퀴즈 제출 테스트 (중복 제출 방지 포함)
-12. 권한 테스트
-13. 저집중 구간 추출 단위 테스트
+9. 퀴즈 생성 테스트 (OpenAI mock 포함)
+10. 퀴즈 제출 테스트 (중복 제출 방지 포함)
+11. 권한 테스트
+12. 저집중 구간 추출 단위 테스트
 
 ---
 

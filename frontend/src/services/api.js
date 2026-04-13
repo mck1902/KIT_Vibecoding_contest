@@ -94,6 +94,18 @@ export const sessionAPI = {
   getById: (sessionId) =>
     request('GET', `/sessions/${sessionId}`),
 
+  /** 퀴즈 생성 (저집중 구간 기반) */
+  generateQuiz: (sessionId) =>
+    request('POST', `/sessions/${sessionId}/quiz`, {}),
+
+  /** 퀴즈 조회 → { quiz: Quiz | null } (미생성 시 quiz: null) */
+  getQuiz: (sessionId) =>
+    request('GET', `/sessions/${sessionId}/quiz`),
+
+  /** 퀴즈 제출 → { quiz: Quiz 전체 문서 } */
+  submitQuiz: (sessionId, answers) =>
+    request('PUT', `/sessions/${sessionId}/quiz/submit`, { answers }),
+
   /** 로그인 사용자의 세션 목록 조회 (역할별 자동 필터) */
   getAll: () =>
     request('GET', '/sessions'),
