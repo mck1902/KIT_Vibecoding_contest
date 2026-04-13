@@ -48,14 +48,31 @@ function generateRuleBasedTips({ records, departures, avgFocus }) {
 /**
  * records 배열을 1분 단위 차트 데이터로 변환
  * X축: 세션 시작 기준 경과 시간 (0분, 1분, ...)
+ * pauseEvents가 있으면 일시정지 기간의 레코드를 제외
  */
-function buildChartData(records) {
+function buildChartData(records, pauseEvents = []) {
   if (!records || records.length === 0) return [];
 
-  const firstMs = new Date(records[0].timestamp).getTime();
+  let filtered = records;
+  if (pauseEvents.length > 0) {
+    const pauseRanges = pauseEvents
+      .filter(p => p.pauseTime && p.resumeTime)
+      .map(p => [new Date(p.pauseTime).getTime(), new Date(p.resumeTime).getTime()]);
+
+    if (pauseRanges.length > 0) {
+      filtered = records.filter(r => {
+        const t = new Date(r.timestamp).getTime();
+        return !pauseRanges.some(([start, end]) => t >= start && t <= end);
+      });
+    }
+  }
+
+  if (filtered.length === 0) return [];
+
+  const firstMs = new Date(filtered[0].timestamp).getTime();
   const byMinute = {};
 
-  for (const r of records) {
+  for (const r of filtered) {
     const elapsed = Math.floor((new Date(r.timestamp).getTime() - firstMs) / 60000);
     const key = `${elapsed}분`;
     if (!byMinute[key]) byMinute[key] = [];

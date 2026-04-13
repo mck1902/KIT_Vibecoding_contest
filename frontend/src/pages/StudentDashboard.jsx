@@ -236,6 +236,13 @@ const StudentDashboard = () => {
     const interval = setInterval(async () => {
       if (!sessionIdRef.current) return;
 
+      // 영상 일시정지 중에는 집중도 기록을 쌓지 않음
+      if (pauseStartRef.current) {
+        tick += 1;
+        if (tick >= 3) tick = 0;
+        return;
+      }
+
       // 매 틱(1초)마다 현재 상태를 버퍼에 추가
       recordBufferRef.current.push({
         timestamp: new Date().toISOString(),

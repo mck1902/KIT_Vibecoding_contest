@@ -225,11 +225,29 @@ function parseMinutes(timeStr) {
  * GPT-4o-mini로 학부모용 학습 태도 분석 리포트 생성
  */
 async function generateRagReport(sessionData, lectureSegments, lectureTitle) {
-  const { records, departures, pauseEvents = [], avgFocus, startTime, endTime } = sessionData;
+  const { records: rawRecords, departures, pauseEvents = [], avgFocus, startTime, endTime } = sessionData;
 
   // --- 선행조건: 데이터 부족 시 GPT 호출하지 않음 ---
-  if (!records || records.length < 10) {
+  if (!rawRecords || rawRecords.length < 10) {
     return '학습 데이터가 부족합니다 (최소 10초 이상 학습 필요).';
+  }
+
+  // 일시정지 기간의 레코드 제외
+  let records = rawRecords;
+  if (pauseEvents.length > 0) {
+    const pauseRanges = pauseEvents
+      .filter(p => p.pauseTime && p.resumeTime)
+      .map(p => [new Date(p.pauseTime).getTime(), new Date(p.resumeTime).getTime()]);
+    if (pauseRanges.length > 0) {
+      records = rawRecords.filter(r => {
+        const t = new Date(r.timestamp).getTime();
+        return !pauseRanges.some(([s, e]) => t >= s && t <= e);
+      });
+    }
+  }
+
+  if (records.length < 10) {
+    return '유효 학습 데이터가 부족합니다 (일시정지 제외 후 최소 10초 이상 필요).';
   }
 
   const client = getOpenAIClient();

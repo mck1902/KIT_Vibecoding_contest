@@ -56,18 +56,18 @@ const createSessionSchema = z.object({
   subject: z.string().max(100).optional().default(''),
 });
 
+const recordObject = z.object({
+  timestamp: z.string().datetime({ message: 'timestamp는 ISO 8601 형식이어야 합니다.' }),
+  status: z.number().int().min(1).max(5),
+  confidence: z.number().min(0).max(1),
+  focusProb: z.number().min(0).max(100).nullable().optional(),
+  videoTime: z.number().min(0).nullable().optional(),
+});
+
 const addRecordsSchema = z.object({
   records: z.union([
-    z.array(z.object({
-      timestamp: z.string().datetime({ message: 'timestamp는 ISO 8601 형식이어야 합니다.' }),
-      status: z.number().int().min(1).max(5),
-      confidence: z.number().min(0).max(1),
-    })).min(1, 'records는 1개 이상이어야 합니다.'),
-    z.object({
-      timestamp: z.string().datetime(),
-      status: z.number().int().min(1).max(5),
-      confidence: z.number().min(0).max(1),
-    }),
+    z.array(recordObject).min(1, 'records는 1개 이상이어야 합니다.'),
+    recordObject,
   ]),
 });
 
