@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { sessionAPI, edupointAPI } from '../services/api';
+import { sessionAPI, edupointAPI, BASE_URL } from '../services/api';
 import lectures from '../data/lectures.json';
 import useWebcam from '../hooks/useWebcam';
 import useAttentionAnalysis from '../hooks/useAttentionAnalysis';
@@ -411,8 +411,8 @@ const StudentDashboard = () => {
     const handleBeforeUnload = () => {
       if (sessionIdRef.current && sessionStartedRef.current) {
         const currentTime = Math.round(playerRef.current?.getCurrentTime?.() ?? 0);
-        const token = localStorage.getItem('token');
-        fetch(`/api/sessions/${sessionIdRef.current}/pause`, {
+        const token = localStorage.getItem('eduwatch_token');
+        fetch(`${BASE_URL}/sessions/${sessionIdRef.current}/pause`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ lastVideoTime: currentTime }),
