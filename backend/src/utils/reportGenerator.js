@@ -47,14 +47,17 @@ function generateRuleBasedTips({ records, departures, avgFocus }) {
 
 /**
  * records 배열을 1분 단위 차트 데이터로 변환
+ * X축: 세션 시작 기준 경과 시간 (0분, 1분, ...)
  */
 function buildChartData(records) {
   if (!records || records.length === 0) return [];
 
+  const firstMs = new Date(records[0].timestamp).getTime();
   const byMinute = {};
+
   for (const r of records) {
-    const d = new Date(r.timestamp);
-    const key = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const elapsed = Math.floor((new Date(r.timestamp).getTime() - firstMs) / 60000);
+    const key = `${elapsed}분`;
     if (!byMinute[key]) byMinute[key] = [];
     byMinute[key].push(calcFocus(r.status, r.confidence, r.focusProb));
   }

@@ -58,11 +58,7 @@
 .text-primary { color: var(--primary); }
 .warning { color: #f59e0b; }
 
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 2rem;
-}
+/* removed dashboard-grid */
 
 .chart-section {
   padding: 1.5rem;
@@ -74,8 +70,8 @@
 }
 
 .report-section {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
 }
 
@@ -112,7 +108,7 @@
 }
 
 @media (max-width: 900px) {
-  .dashboard-grid {
+  .report-section {
     grid-template-columns: 1fr;
   }
 }

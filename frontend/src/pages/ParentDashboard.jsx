@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { sessionAPI, authAPI, edupointAPI } from '../services/api';
+import { Coins } from 'lucide-react';
 import PointBalance from '../components/point/PointBalance';
 import PointHistory from '../components/point/PointHistory';
 import WeeklyProgress from '../components/point/WeeklyProgress';
@@ -37,6 +38,8 @@ const ParentDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [edupoint, setEdupoint] = useState(null);
   const [edupointRefresh, setEdupointRefresh] = useState(0);
+  const [reportKey, setReportKey] = useState(0); // 같은 세션 ID여도 강제 재로드용
+  const [statusFilter, setStatusFilter] = useState('ended'); // 'ended' | 'ongoing'
 
   // 자녀 정보 + 세션 목록 불러오기 (children 변경 시 재조회)
   useEffect(() => {
@@ -48,7 +51,10 @@ const ParentDashboard = () => {
       .then(data => {
         if (Array.isArray(data)) {
           setSessions(data);
-          if (data.length > 0) setSelectedSessionId(data[0]._id);
+          // 종료된 세션 중 가장 최근 것을 기본 선택 (진행중 세션 제외)
+          const ended = data.filter(s => s.endTime);
+          const defaultSession = ended.length > 0 ? ended[0] : data[0];
+          if (defaultSession) setSelectedSessionId(defaultSession._id);
         }
       })
       .catch(() => {});
@@ -62,7 +68,7 @@ const ParentDashboard = () => {
       .then(data => setReport(data))
       .catch(() => setReport(null))
       .finally(() => setLoading(false));
-  }, [selectedSessionId]);
+  }, [selectedSessionId, reportKey]);
 
   // RAG 분석 불러오기
   useEffect(() => {
@@ -89,15 +95,25 @@ const ParentDashboard = () => {
 
   const handleEdupointUpdate = () => setEdupointRefresh(k => k + 1);
 
-  // 선택된 자녀 기준으로 세션 필터링
-  const filteredSessions = selectedChild
+  // 자녀 + 완료 여부로 세션 필터링
+  const childSessions = selectedChild
     ? sessions.filter(s => s.studentId === selectedChild.studentId)
     : sessions;
+  const filteredSessions = childSessions.filter(s =>
+    statusFilter === 'ended' ? !!s.endTime : !s.endTime
+  );
 
   const chartData = report?.chartData?.length > 0 ? report.chartData : [];
   const hasReport = !!report;
 
-  // 자녀 선택 변경 시 세션 초기화
+  // 필터링된 세션에서 첫 번째를 선택하고 리포트 로드
+  const selectFirstSession = (list) => {
+    const newId = list.length > 0 ? list[0]._id : null;
+    setSelectedSessionId(newId);
+    setReportKey(k => k + 1);
+  };
+
+  // 자녀 선택 변경
   const handleChildSelect = (child) => {
     setSelectedChild(child);
     setReport(null);
@@ -105,7 +121,22 @@ const ParentDashboard = () => {
     const target = child
       ? sessions.filter(s => s.studentId === child.studentId)
       : sessions;
-    setSelectedSessionId(target.length > 0 ? target[0]._id : null);
+    // 자녀 변경 시 statusFilter 유지, 해당 필터에 맞는 첫 세션 선택
+    const filtered = target.filter(s =>
+      statusFilter === 'ended' ? !!s.endTime : !s.endTime
+    );
+    selectFirstSession(filtered);
+  };
+
+  // 완료/미완료 토글
+  const handleStatusFilter = (status) => {
+    setStatusFilter(status);
+    setReport(null);
+    setRagText('');
+    const filtered = childSessions.filter(s =>
+      status === 'ended' ? !!s.endTime : !s.endTime
+    );
+    selectFirstSession(filtered);
   };
 
   const handleLink = async (e) => {
@@ -139,8 +170,9 @@ const ParentDashboard = () => {
           <button
             className="point-nav-btn"
             onClick={() => navigate('/parent/point-settings')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            🪙 에듀 포인트 설정
+            <Coins size={16} fill="#f59e0b" stroke="currentColor" strokeWidth={1.5} /> 에듀 포인트 설정
           </button>
         </div>
         <p className="subtitle">
@@ -180,27 +212,58 @@ const ParentDashboard = () => {
           </form>
         )}
 
-        {/* 자녀 선택 드롭다운 (다자녀일 때만 표시) */}
-        {children.length > 1 && (
-          <select
-            className="session-select"
-            value={selectedChild?.studentId ?? ''}
-            onChange={(e) => {
-              const child = children.find(c => c.studentId === e.target.value) ?? null;
-              handleChildSelect(child);
-            }}
-          >
-            <option value="">전체 자녀 ({children.length}명)</option>
-            {children.map(child => (
-              <option key={child.studentId} value={child.studentId}>
-                {child.name} ({child.gradeLevel === 'high' ? '고등' : '중등'})
-              </option>
-            ))}
-          </select>
+        {/* 필터 행: 자녀 선택 + 완료/미완료 토글 */}
+        {user?.children?.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+            {/* 자녀 선택 (다자녀일 때만) */}
+            {children.length > 1 && (
+              <select
+                className="session-select"
+                style={{ margin: 0 }}
+                value={selectedChild?.studentId ?? ''}
+                onChange={(e) => {
+                  const child = children.find(c => c.studentId === e.target.value) ?? null;
+                  handleChildSelect(child);
+                }}
+              >
+                <option value="">전체 자녀 ({children.length}명)</option>
+                {children.map(child => (
+                  <option key={child.studentId} value={child.studentId}>
+                    {child.name} ({child.gradeLevel === 'high' ? '고등' : '중등'})
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* 완료 / 미완료 토글 */}
+            <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--card-border)' }}>
+              {[
+                { key: 'ended',   label: '완료', count: childSessions.filter(s => !!s.endTime).length },
+                { key: 'ongoing', label: '미완료', count: childSessions.filter(s => !s.endTime).length },
+              ].map(({ key, label, count }) => (
+                <button
+                  key={key}
+                  onClick={() => handleStatusFilter(key)}
+                  style={{
+                    padding: '6px 14px',
+                    fontSize: '0.85rem',
+                    fontWeight: statusFilter === key ? 700 : 400,
+                    background: statusFilter === key ? 'var(--primary)' : 'var(--card-bg)',
+                    color: statusFilter === key ? '#fff' : 'var(--text-muted)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  {label} {count > 0 && <span style={{ opacity: 0.8 }}>({count})</span>}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
-        {/* 세션 선택 드롭다운 */}
-        {filteredSessions.length > 1 && (
+        {/* 강의 선택 드롭다운 */}
+        {filteredSessions.length > 0 && (
           <select
             value={selectedSessionId || ''}
             onChange={(e) => setSelectedSessionId(e.target.value)}
@@ -215,7 +278,9 @@ const ParentDashboard = () => {
         )}
         {user?.children?.length > 0 && filteredSessions.length === 0 && !loading && (
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-            {selectedChild ? `${selectedChild.name}의 세션이 없습니다.` : '자녀의 세션이 없습니다. 학생 계정으로 세션을 시작해보세요.'}
+            {statusFilter === 'ended'
+              ? (selectedChild ? `${selectedChild.name}의 완료된 강의가 없습니다.` : '완료된 강의가 없습니다.')
+              : (selectedChild ? `${selectedChild.name}의 미완료 강의가 없습니다.` : '미완료 강의가 없습니다.')}
           </p>
         )}
       </header>
@@ -264,8 +329,7 @@ const ParentDashboard = () => {
         );
       })()}
 
-      <div className="dashboard-grid">
-        <section className="chart-section glass">
+      <section className="chart-section glass" style={{ marginBottom: '2rem' }}>
           <h3>집중도 추이</h3>
           <div className="chart-wrapper">
             {chartData.length > 0 ? (
@@ -327,7 +391,6 @@ const ParentDashboard = () => {
             )}
           </div>
         </section>
-      </div>
     </div>
   );
 };

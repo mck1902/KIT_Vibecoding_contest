@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FiSun, FiMoon, FiLogOut, FiSettings } from 'react-icons/fi';
+import { Coins } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { edupointAPI } from '../../services/api';
 import './NavBar.css';
@@ -54,9 +55,10 @@ const NavBar = ({ theme, toggleTheme }) => {
           {user ? (
             <div className="nav-user">
               {studentEarned !== null && (
-                <span className="nav-point-badge">
-                  🪙 {studentEarned.toLocaleString()}P
-                </span>
+                <div className="nav-point-badge">
+                  <span className="point-icon"><Coins size={16} fill="var(--button-bg, #f59e0b)" stroke="currentColor" strokeWidth={1.5} /></span>
+                  <span className="point-value">{studentEarned.toLocaleString()}P</span>
+                </div>
               )}
               <span className="nav-username">{user.name}</span>
               <Link

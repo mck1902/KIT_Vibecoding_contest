@@ -150,7 +150,7 @@ export default function SessionReport() {
         <div className="sr-summary-card glass">
           <div className="sr-summary-label">분석 구간 수</div>
           <div className="sr-summary-value">
-            {report.chartData?.length ?? 0}분
+            {report.chartData?.length ?? 0}구간
           </div>
         </div>
       </section>
