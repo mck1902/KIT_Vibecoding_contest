@@ -7,8 +7,11 @@ const Parent = require('../models/Parent');
 const DEMO_STUDENT_ID = 'demo-student-001';
 
 async function seed() {
-  await mongoose.connect(process.env.MONGODB_URI);
-  console.log('DB 연결 완료');
+  const dbTarget = process.env.DB_TARGET || 'test';
+  const dbUri = dbTarget === 'dev' ? process.env.MONGODB_URI_DEV : process.env.MONGODB_URI_TEST;
+  if (!dbUri) { console.error(`MONGODB_URI_${dbTarget.toUpperCase()}가 .env에 설정되지 않았습니다.`); process.exit(1); }
+  await mongoose.connect(dbUri);
+  console.log(`DB 연결 완료 (${dbTarget})`);
 
   // 1) 데모 학생 생성/업데이트
   const passwordHash = await bcrypt.hash('password123', 10);

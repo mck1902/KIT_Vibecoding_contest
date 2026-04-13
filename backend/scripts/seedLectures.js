@@ -20,8 +20,11 @@ const UI_FIELDS = {
 };
 
 async function seed() {
-  await mongoose.connect(process.env.MONGODB_URI);
-  console.log("MongoDB 연결 완료");
+  const dbTarget = process.env.DB_TARGET || 'test';
+  const dbUri = dbTarget === 'dev' ? process.env.MONGODB_URI_DEV : process.env.MONGODB_URI_TEST;
+  if (!dbUri) { console.error(`MONGODB_URI_${dbTarget.toUpperCase()}가 .env에 설정되지 않았습니다.`); process.exit(1); }
+  await mongoose.connect(dbUri);
+  console.log(`MongoDB 연결 완료 (${dbTarget})`);
 
   const lectures = JSON.parse(fs.readFileSync(LECTURES_JSON, "utf-8"));
 
