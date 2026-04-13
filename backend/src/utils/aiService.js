@@ -253,7 +253,7 @@ function parseMinutes(timeStr) {
  * GPT-4o-mini로 학부모용 학습 태도 분석 리포트 생성
  */
 async function generateRagReport(sessionData, lectureSegments, lectureTitle) {
-  const { records: rawRecords, departures, pauseEvents = [], avgFocus, startTime, endTime } = sessionData;
+  const { records: rawRecords, departures, pauseEvents = [], sessionPauses = [], avgFocus, startTime, endTime } = sessionData;
 
   // --- 선행조건: 데이터 부족 시 GPT 호출하지 않음 ---
   if (!rawRecords || rawRecords.length < 10) {
@@ -282,10 +282,14 @@ async function generateRagReport(sessionData, lectureSegments, lectureTitle) {
   const total = records.length;
   const startMs = new Date(startTime).getTime();
 
-  // --- 1. 총 학습 시간 ---
-  const totalSec = (startTime && endTime)
+  // --- 1. 총 학습 시간 (세션 이탈 시간 제외) ---
+  const sessionPauseSec = sessionPauses
+    .filter(p => p.duration > 0)
+    .reduce((sum, p) => sum + p.duration, 0) / 1000;
+  const rawSec = (startTime && endTime)
     ? Math.round((new Date(endTime) - new Date(startTime)) / 1000)
     : 0;
+  const totalSec = Math.max(0, Math.round(rawSec - sessionPauseSec));
   const totalMin = Math.floor(totalSec / 60);
   const remainSec = totalSec % 60;
   const durationText = totalSec > 0 ? `${totalMin}분 ${remainSec}초` : '측정 불가';

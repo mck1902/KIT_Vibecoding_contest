@@ -136,7 +136,7 @@ export default function SessionReport() {
         </div>
       </header>
 
-      {/* 요약 카드 4개 */}
+      {/* 요약 카드 */}
       <section className="sr-summary-row">
         <div className="sr-summary-card glass">
           <div className="sr-summary-label">총 학습 시간</div>
@@ -157,12 +157,22 @@ export default function SessionReport() {
             {report.departureCount}회
           </div>
         </div>
-        <div className="sr-summary-card glass">
-          <div className="sr-summary-label">분석 구간 수</div>
-          <div className="sr-summary-value">
-            {report.chartData?.length ?? 0}구간
+        {report.videoPauseCount > 0 && (
+          <div className="sr-summary-card glass">
+            <div className="sr-summary-label">영상 일시정지</div>
+            <div className="sr-summary-value">
+              {report.videoPauseCount}회 ({formatDuration(report.videoPauseSec)})
+            </div>
           </div>
-        </div>
+        )}
+        {report.sessionPauseCount > 0 && (
+          <div className="sr-summary-card glass">
+            <div className="sr-summary-label">이어보기 이탈</div>
+            <div className="sr-summary-value" style={{ color: '#f59e0b' }}>
+              {report.sessionPauseCount}회 ({formatDuration(report.sessionPauseSec)})
+            </div>
+          </div>
+        )}
       </section>
 
       {/* 집중도 타임라인 차트 */}

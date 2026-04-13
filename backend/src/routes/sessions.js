@@ -2,6 +2,8 @@ const express = require('express');
 const {
   createSession,
   endSession,
+  pauseSession,
+  deleteSession,
   addRecords,
   addDeparture,
   addPauseEvent,
@@ -20,6 +22,8 @@ router.post('/', requireAuth, requireRole('student'), validate(schemas.createSes
 router.get('/', requireAuth, getSessions);
 router.get('/:id', requireAuth, getSessionById);
 router.put('/:id/end', requireAuth, requireRole('student'), validate(schemas.endSession), endSession);
+router.put('/:id/pause', requireAuth, requireRole('student'), pauseSession);
+router.delete('/:id', requireAuth, requireRole('student'), deleteSession);
 router.post('/:id/records', requireAuth, requireRole('student'), validate(schemas.addRecords), addRecords);
 router.post('/:id/departures', requireAuth, requireRole('student'), validate(schemas.addDeparture), addDeparture);
 router.post('/:id/pause-events', requireAuth, requireRole('student'), addPauseEvent);

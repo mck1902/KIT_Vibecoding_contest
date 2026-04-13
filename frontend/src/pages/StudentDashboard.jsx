@@ -32,6 +32,9 @@ const StudentDashboard = () => {
   const [ytDuration, setYtDuration] = useState(0);
   const [playerReady, setPlayerReady] = useState(false);
 
+  // 이어보기 모달
+  const [resumeModal, setResumeModal] = useState(null); // { sessionId, lastVideoTime }
+
   // 에듀 포인트 상태
   const [targetRate, setTargetRate] = useState(null);    // 목표 집중률 (null이면 미설정)
   const [rewardPerSession, setRewardPerSession] = useState(null); // 세션당 보상 포인트
@@ -403,6 +406,24 @@ const StudentDashboard = () => {
     }
   }, [analysis.isModelLoaded, webcam.isActive]);
 
+  // 브라우저 닫기/새로고침 시 세션 일시중단
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (sessionIdRef.current && sessionStartedRef.current) {
+        const currentTime = Math.round(playerRef.current?.getCurrentTime?.() ?? 0);
+        const token = localStorage.getItem('token');
+        fetch(`/api/sessions/${sessionIdRef.current}/pause`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ lastVideoTime: currentTime }),
+          keepalive: true,
+        });
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   // 세션 경과 시간
   useEffect(() => {
     if (!sessionStarted) return;
@@ -420,21 +441,11 @@ const StudentDashboard = () => {
     return `${m}:${ss}`;
   };
 
-  const handleStartSession = async () => {
-    try {
-      const data = await sessionAPI.start(selectedLecture.id, selectedLecture.subject);
-      sessionIdRef.current = data._id || null;
-      if (!sessionIdRef.current) {
-        alert('세션을 시작할 수 없습니다. 다시 시도해주세요.');
-        return;
-      }
-    } catch (_) {
-      sessionIdRef.current = null;
-      alert('서버 연결에 실패했습니다. 네트워크를 확인해주세요.');
-      return;
-    }
+  // 세션 시작 공통 로직 (세션 ID 설정 후 재생 시작)
+  const beginSession = (sessionId, seekTo = 0) => {
+    sessionIdRef.current = sessionId;
 
-    // 포인트 설정 로드 (세션 시작 시 최신값 갱신)
+    // 포인트 설정 로드
     if (user?.studentId) {
       edupointAPI.get(user.studentId)
         .then(data => {
@@ -456,8 +467,57 @@ const StudentDashboard = () => {
     setDepartureCount(0);
 
     if (playerRef.current && playerReadyRef.current) {
+      if (seekTo > 0) {
+        playerRef.current.seekTo(seekTo, true);
+        lastValidTimeRef.current = seekTo;
+      }
       playerRef.current.playVideo();
     }
+  };
+
+  const handleStartSession = async () => {
+    try {
+      const data = await sessionAPI.start(selectedLecture.id, selectedLecture.subject);
+      if (!data._id) {
+        alert('세션을 시작할 수 없습니다. 다시 시도해주세요.');
+        return;
+      }
+
+      // 미종료 세션이 존재하면 이어보기 모달 표시
+      if (data.resumed) {
+        setResumeModal({ sessionId: data._id, lastVideoTime: data.lastVideoTime || 0 });
+        return;
+      }
+
+      beginSession(data._id);
+    } catch (_) {
+      alert('서버 연결에 실패했습니다. 네트워크를 확인해주세요.');
+    }
+  };
+
+  // 이어보기 선택
+  const handleResume = () => {
+    if (!resumeModal) return;
+    beginSession(resumeModal.sessionId, resumeModal.lastVideoTime);
+    setResumeModal(null);
+  };
+
+  // 처음부터 시작 선택 (기존 세션 삭제 후 새 세션 생성)
+  const handleRestartFromBeginning = async () => {
+    if (!resumeModal) return;
+    try {
+      await sessionAPI.delete(resumeModal.sessionId);
+      const data = await sessionAPI.start(selectedLecture.id, selectedLecture.subject);
+      if (!data._id) {
+        alert('세션을 시작할 수 없습니다.');
+        setResumeModal(null);
+        return;
+      }
+      beginSession(data._id);
+    } catch (_) {
+      alert('서버 연결에 실패했습니다.');
+    }
+    setResumeModal(null);
   };
 
   const MIN_SESSION_SEC = 60; // 리포트 생성 최소 시청 시간 (1분)
@@ -477,45 +537,49 @@ const StudentDashboard = () => {
 
     const sid = sessionIdRef.current;
     const videoDuration = Math.round(playerRef.current?.getDuration?.() ?? 0);
+    const currentTime = Math.round(playerRef.current?.getCurrentTime?.() ?? 0);
     const watched = ended
       ? (playerRef.current?.getDuration?.() ?? elapsedRef.current)
-      : (playerRef.current?.getCurrentTime?.() ?? elapsedRef.current);
+      : currentTime;
     sessionIdRef.current = null;
     setSessionStarted(false);
 
     try {
-      let endData = null;
-      if (sid) {
-        // PUT /end 실패 시 1회 재시도 (네트워크 순단 대비)
-        try {
-          endData = await sessionAPI.end(sid, abandoned, Math.round(watched), videoDuration);
-        } catch (_) {
-          await new Promise(r => setTimeout(r, 1500));
-          endData = await sessionAPI.end(sid, abandoned, Math.round(watched), videoDuration);
+      // 완강 또는 강의 전환(abandoned) → 세션 종료
+      if (ended || abandoned) {
+        let endData = null;
+        if (sid) {
+          try {
+            endData = await sessionAPI.end(sid, abandoned, Math.round(watched), videoDuration);
+          } catch (_) {
+            await new Promise(r => setTimeout(r, 1500));
+            endData = await sessionAPI.end(sid, abandoned, Math.round(watched), videoDuration);
+          }
+        }
+        // 포인트 획득 시 축하 모달 표시 후 리포트로 이동
+        if (endData?.pointEarned > 0) {
+          setEarnedPoints(endData.pointEarned);
+          setStudentEarned(endData.studentEarned ?? studentEarned);
+          setShowGoalModal(true);
+          setTimeout(() => {
+            setShowGoalModal(false);
+            if (ended && watched >= MIN_SESSION_SEC) {
+              navigate(`/student/report/${sid}`);
+            }
+          }, 2500);
+        } else if (ended && sid && watched >= MIN_SESSION_SEC) {
+          navigate(`/student/report/${sid}`);
+        }
+      } else {
+        // 미완강 수동 종료 → pause (세션 유지, 다음에 이어보기 가능)
+        if (sid) {
+          try {
+            await sessionAPI.pause(sid, currentTime);
+          } catch (_) { }
         }
       }
-      // 포인트 획득 시 축하 모달 표시 후 리포트로 이동
-      if (endData?.pointEarned > 0) {
-        setEarnedPoints(endData.pointEarned);
-        setStudentEarned(endData.studentEarned ?? studentEarned);
-        setShowGoalModal(true);
-        // 2초 후 자동으로 리포트 페이지로 이동
-        setTimeout(() => {
-          setShowGoalModal(false);
-          if (watched >= MIN_SESSION_SEC || force) {
-            navigate(`/student/report/${sid}`);
-          } else {
-            navigate('/student');
-          }
-        }, 2500);
-      } else if (sid && (watched >= MIN_SESSION_SEC || force)) {
-        navigate(`/student/report/${sid}`);
-      } else {
-        navigate('/student');
-      }
     } catch (_) {
-      // 재시도 후에도 실패 — endTime 미저장 상태로 이동 (어쩔 수 없는 케이스)
-      navigate('/student');
+      // 네트워크 실패 시에도 페이지 이동
     } finally {
       isEndingRef.current = false;
     }
@@ -526,7 +590,8 @@ const StudentDashboard = () => {
 
   const handleLectureSelect = async (lec) => {
     if (sessionStarted) {
-      await handleEndSession(false, true); // 강의 전환 = 중도 이탈 (포인트 미지급)
+      // 강의 전환 시 현재 세션은 pause (이어보기 가능)
+      await handleEndSession(false, false, false);
     } else {
       analysis.stopAnalysis();
       webcam.stop();
@@ -611,8 +676,12 @@ const StudentDashboard = () => {
               <div className="filled-bar" style={{ width: `${progressPct}%` }}></div>
             </div>
             <div className="control-actions">
-              {sessionStarted && elapsed >= MIN_SESSION_SEC && (
-                <span className="session-hint">영상이 끝나면 리포트가 자동 생성됩니다</span>
+              {sessionStarted && (
+                <span className="session-hint">
+                  {elapsed >= MIN_SESSION_SEC
+                    ? '영상이 끝나면 리포트가 자동 생성됩니다 · 중간에 나가면 이어보기 가능'
+                    : '중간에 나가면 이어보기 가능'}
+                </span>
               )}
             </div>
           </div>
@@ -716,6 +785,32 @@ const StudentDashboard = () => {
 
         </div>
       </div>
+
+      {/* 이어보기 선택 모달 */}
+      {resumeModal && (
+        <div className="goal-modal-overlay">
+          <div className="goal-modal glass" style={{ maxWidth: 360 }}>
+            <h3>이전 시청 기록이 있습니다</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0.8rem 0 1.2rem' }}>
+              {resumeModal.lastVideoTime > 0
+                ? `${formatTime(resumeModal.lastVideoTime)} 지점부터 이어서 시청하시겠습니까?`
+                : '이전 학습 기록을 이어서 진행하시겠습니까?'}
+            </p>
+            <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center' }}>
+              <button className="start-session-btn" style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem' }} onClick={handleResume}>
+                이어서 시청
+              </button>
+              <button
+                className="start-session-btn"
+                style={{ fontSize: '0.85rem', padding: '0.6rem 1.2rem', background: 'var(--card-border)', color: 'var(--text-main)' }}
+                onClick={handleRestartFromBeginning}
+              >
+                처음부터 시작
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 목표 달성 축하 모달 */}
       {showGoalModal && (

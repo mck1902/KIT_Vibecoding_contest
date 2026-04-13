@@ -70,6 +70,14 @@ export const sessionAPI = {
   end: (sessionId, abandoned = false, watchedSec = 0, videoDuration = 0) =>
     request('PUT', `/sessions/${sessionId}/end`, { abandoned, watchedSec, videoDuration }),
 
+  /** 세션 일시중단 — lastVideoTime 저장, 세션 종료하지 않음 */
+  pause: (sessionId, lastVideoTime = 0) =>
+    request('PUT', `/sessions/${sessionId}/pause`, { lastVideoTime }),
+
+  /** 미종료 세션 삭제 — 처음부터 다시 시작 시 */
+  delete: (sessionId) =>
+    request('DELETE', `/sessions/${sessionId}`),
+
   /** 집중도 기록 배열 일괄 저장 */
   addRecords: (sessionId, records) =>
     request('POST', `/sessions/${sessionId}/records`, { records }),

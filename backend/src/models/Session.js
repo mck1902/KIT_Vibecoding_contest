@@ -39,9 +39,19 @@ const sessionSchema = new mongoose.Schema(
       }],
       default: [],
     },
+    sessionPauses: {
+      type: [{
+        pausedAt: { type: Date, required: true },
+        resumedAt: { type: Date, default: null },
+        duration: { type: Number, default: 0, min: 0 }, // ms
+        _id: false,
+      }],
+      default: [],
+    },
     ragAnalysis: { type: String, default: null },  // 생성 후 캐시 — API 재호출 방지
     focusRate: { type: Number, default: null },
     completionRate: { type: Number, default: 0 },
+    lastVideoTime: { type: Number, default: 0 },
     pointEarned: { type: Number, default: null },
     pointAwarded: { type: Boolean, default: false },
   },

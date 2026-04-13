@@ -195,7 +195,7 @@ async function checkWeeklyBonus(studentId, edupoint) {
   return null;
 }
 
-// POST /api/sessions — 세션 시작
+// POST /api/sessions — 세션 시작 (미종료 세션이 있으면 반환)
 async function createSession(req, res) {
   try {
     const { lectureId, subject } = req.body;
@@ -203,6 +203,22 @@ async function createSession(req, res) {
     if (!studentId || !lectureId) {
       return res.status(400).json({ message: 'studentId and lectureId are required.' });
     }
+
+    // 같은 학생+강의의 미종료 세션이 있으면 기존 세션 반환
+    const existing = await Session.findOne({ studentId, lectureId, endTime: null });
+    if (existing) {
+      // 마지막 sessionPause의 resumedAt 기록 (이어보기 시점)
+      const pauses = existing.sessionPauses || [];
+      const lastPause = pauses[pauses.length - 1];
+      if (lastPause && !lastPause.resumedAt) {
+        const now = new Date();
+        lastPause.resumedAt = now;
+        lastPause.duration = now - new Date(lastPause.pausedAt);
+        await existing.updateOne({ sessionPauses: pauses });
+      }
+      return res.status(200).json({ ...existing.toObject(), sessionPauses: pauses, resumed: true });
+    }
+
     const session = await Session.create({
       studentId,
       lectureId,
@@ -213,6 +229,60 @@ async function createSession(req, res) {
   } catch (error) {
     console.error('[createSession]', error);
     return res.status(500).json({ message: 'Failed to create session.' });
+  }
+}
+
+// PUT /api/sessions/:id/pause — 세션 일시중단 (lastVideoTime 저장, endTime 미설정)
+async function pauseSession(req, res) {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid session ID.' });
+    }
+    const session = await Session.findById(id);
+    if (!session) return res.status(404).json({ message: 'Session not found.' });
+    if (session.studentId !== req.user.studentId) {
+      return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
+    }
+    if (session.endTime) {
+      return res.status(200).json(session.toObject());
+    }
+
+    const { lastVideoTime = 0 } = req.body;
+    // sessionPauses에 pausedAt 기록
+    const pausedAt = new Date();
+    await session.updateOne({
+      lastVideoTime,
+      $push: { sessionPauses: { pausedAt } },
+    });
+    return res.status(200).json({ ...session.toObject(), lastVideoTime });
+  } catch (error) {
+    console.error('[pauseSession]', error);
+    return res.status(500).json({ message: 'Failed to pause session.' });
+  }
+}
+
+// DELETE /api/sessions/:id — 미종료 세션 삭제 (처음부터 다시 시작 시)
+async function deleteSession(req, res) {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid session ID.' });
+    }
+    const session = await Session.findById(id);
+    if (!session) return res.status(404).json({ message: 'Session not found.' });
+    if (session.studentId !== req.user.studentId) {
+      return res.status(403).json({ message: '이 세션에 접근할 권한이 없습니다.' });
+    }
+    // 이미 종료된 세션은 삭제 불가
+    if (session.endTime) {
+      return res.status(400).json({ message: '이미 종료된 세션은 삭제할 수 없습니다.' });
+    }
+    await Session.deleteOne({ _id: id });
+    return res.status(200).json({ message: 'Session deleted.' });
+  } catch (error) {
+    console.error('[deleteSession]', error);
+    return res.status(500).json({ message: 'Failed to delete session.' });
   }
 }
 
@@ -373,9 +443,23 @@ async function getSessionReport(req, res) {
       avgFocus,
     });
     const chartData = buildChartData(session.records, session.pauseEvents);
-    const totalSec = session.endTime
+
+    // 세션 pause 총 시간 (이탈 후 이어보기까지 빠진 시간, ms → sec)
+    const sessionPauseSec = (session.sessionPauses || [])
+      .filter(p => p.duration > 0)
+      .reduce((sum, p) => sum + p.duration, 0) / 1000;
+
+    // 영상 일시정지 총 시간 (ms → sec)
+    const videoPauseSec = (session.pauseEvents || [])
+      .filter(p => p.duration > 0)
+      .reduce((sum, p) => sum + p.duration, 0) / 1000;
+
+    // 총 학습시간 = (endTime - startTime) - 세션 이탈 시간
+    // 영상 멈춤 시간은 학습시간에 포함
+    const rawSec = session.endTime
       ? Math.round((new Date(session.endTime) - new Date(session.startTime)) / 1000)
       : 0;
+    const totalSec = Math.max(0, Math.round(rawSec - sessionPauseSec));
 
     return res.status(200).json({
       sessionId: session._id,
@@ -385,6 +469,10 @@ async function getSessionReport(req, res) {
       startTime: session.startTime,
       endTime: session.endTime,
       totalSec,
+      videoPauseCount: (session.pauseEvents || []).filter(p => p.duration > 0).length,
+      videoPauseSec: Math.round(videoPauseSec),
+      sessionPauseCount: (session.sessionPauses || []).filter(p => p.duration > 0).length,
+      sessionPauseSec: Math.round(sessionPauseSec),
       avgFocus,
       departureCount: session.departures.length,
       chartData,
@@ -431,6 +519,7 @@ async function getRagAnalysis(req, res) {
           records: session.records,
           departures: session.departures,
           pauseEvents: session.pauseEvents || [],
+          sessionPauses: session.sessionPauses || [],
           avgFocus,
           startTime: session.startTime,
           endTime: session.endTime,
@@ -501,6 +590,8 @@ async function getSessionById(req, res) {
 module.exports = {
   createSession,
   endSession,
+  pauseSession,
+  deleteSession,
   addRecords,
   addDeparture,
   addPauseEvent,
