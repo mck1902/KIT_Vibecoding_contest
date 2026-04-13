@@ -383,7 +383,23 @@ const ParentDashboard = () => {
             {ragLoading && (
               <p className="rag-loading">AI가 분석 중입니다...</p>
             )}
-            {!ragLoading && ragText && <p>{ragText}</p>}
+            {!ragLoading && ragText && (
+              <div className="rag-text">
+                {ragText.split('\n').map((line, i) => {
+                  if (!line.trim()) return <div key={i} className="rag-spacer" />;
+                  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+                  return (
+                    <p key={i}>
+                      {parts.map((part, j) =>
+                        part.startsWith('**') && part.endsWith('**')
+                          ? <strong key={j}>{part.slice(2, -2)}</strong>
+                          : part
+                      )}
+                    </p>
+                  );
+                })}
+              </div>
+            )}
             {!ragLoading && !ragText && ragError && (
               <p className="rag-fallback">
                 <small className="rag-error-note">※ {ragError}</small>

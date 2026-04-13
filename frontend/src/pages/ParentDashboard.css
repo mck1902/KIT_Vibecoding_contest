@@ -107,6 +107,28 @@
   font-size: 0.95rem;
 }
 
+.rag-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.rag-text p {
+  margin: 0;
+  line-height: 1.75;
+  font-size: 0.93rem;
+  color: var(--text-main);
+}
+
+.rag-text strong {
+  font-weight: 700;
+  color: var(--accent-color, #8b5cf6);
+}
+
+.rag-spacer {
+  height: 0.6rem;
+}
+
 @media (max-width: 900px) {
   .report-section {
     grid-template-columns: 1fr;
