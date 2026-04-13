@@ -14,9 +14,9 @@ const SUBTITLES_DIR = path.join(__dirname, "../data/subtitles");
 
 // 프론트엔드 JSON에만 있는 UI 필드 보충
 const UI_FIELDS = {
-  "lec-001": { duration: "28:00", durationSec: 1680, color: "#3b82f6" },
-  "lec-002": { duration: "40:00", durationSec: 2400, color: "#10b981" },
-  "lec-003": { duration: "30:00", durationSec: 1800, color: "#f59e0b" },
+  "lec-001": { color: "#3b82f6" },
+  "lec-002": { color: "#10b981" },
+  "lec-003": { color: "#f59e0b" },
 };
 
 async function seed() {

@@ -59,6 +59,7 @@ const createSessionSchema = z.object({
 const endSessionSchema = z.object({
   abandoned:  z.boolean().optional().default(false),
   watchedSec: z.number().finite().min(0).optional().default(0),
+  videoDuration: z.number().finite().min(0).optional().default(0),
 });
 
 const recordObject = z.object({

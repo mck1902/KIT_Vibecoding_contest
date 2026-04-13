@@ -476,6 +476,7 @@ const StudentDashboard = () => {
     }
 
     const sid = sessionIdRef.current;
+    const videoDuration = Math.round(playerRef.current?.getDuration?.() ?? 0);
     const watched = ended
       ? (playerRef.current?.getDuration?.() ?? elapsedRef.current)
       : (playerRef.current?.getCurrentTime?.() ?? elapsedRef.current);
@@ -487,10 +488,10 @@ const StudentDashboard = () => {
       if (sid) {
         // PUT /end 실패 시 1회 재시도 (네트워크 순단 대비)
         try {
-          endData = await sessionAPI.end(sid, abandoned, Math.round(watched));
+          endData = await sessionAPI.end(sid, abandoned, Math.round(watched), videoDuration);
         } catch (_) {
           await new Promise(r => setTimeout(r, 1500));
-          endData = await sessionAPI.end(sid, abandoned, Math.round(watched));
+          endData = await sessionAPI.end(sid, abandoned, Math.round(watched), videoDuration);
         }
       }
       // 포인트 획득 시 축하 모달 표시 후 리포트로 이동

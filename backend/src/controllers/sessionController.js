@@ -234,13 +234,16 @@ async function endSession(req, res) {
     }
 
     // 세션 종료 처리
-    const { abandoned = false, watchedSec = 0 } = req.body; // validate 통과 후 보장된 값
+    const { abandoned = false, watchedSec = 0, videoDuration = 0 } = req.body;
     const endTime = new Date();
     const focusRate = calcAvgFocus(session.records, session.pauseEvents);
 
-    // completionRate 계산 — Lecture.durationSec 기반
-    const lecForCompletion = await Lecture.findOne({ lectureId: session.lectureId });
-    const durationSec = lecForCompletion?.durationSec ?? 0;
+    // completionRate 계산 — 프론트에서 전달한 videoDuration 우선, 없으면 Lecture.durationSec 폴백
+    let durationSec = videoDuration;
+    if (!durationSec) {
+      const lecForCompletion = await Lecture.findOne({ lectureId: session.lectureId });
+      durationSec = lecForCompletion?.durationSec ?? 0;
+    }
     const completionRate = durationSec > 0
       ? Math.min(100, Math.round(watchedSec / durationSec * 100))
       : 0;
