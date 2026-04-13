@@ -9,6 +9,8 @@ const { generateRagReport } = require('../utils/aiService');
 const { calcFocus } = require('../utils/constants');
 const { getWeekRangeKST } = require('../utils/weekUtils');
 
+const COMPLETION_THRESHOLD = 90; // 완강 인정 기준 (%)
+
 // JWT의 childStudentIds를 신뢰하지 않고 DB에서 현재 상태를 조회
 // 학생이 연결 해제 후에도 기존 토큰으로 세션에 접근하는 권한 잔류 문제를 방지
 async function fetchParentChildIds(parentId) {
@@ -232,16 +234,24 @@ async function endSession(req, res) {
     }
 
     // 세션 종료 처리
-    const { abandoned = false } = req.body; // 강의 전환 등 중도 이탈 여부
+    const { abandoned = false, watchedSec = 0 } = req.body; // validate 통과 후 보장된 값
     const endTime = new Date();
     const focusRate = calcAvgFocus(session.records, session.pauseEvents);
-    await session.updateOne({ endTime, focusRate });
+
+    // completionRate 계산 — Lecture.durationSec 기반
+    const lecForCompletion = await Lecture.findOne({ lectureId: session.lectureId });
+    const durationSec = lecForCompletion?.durationSec ?? 0;
+    const completionRate = durationSec > 0
+      ? Math.min(100, Math.round(watchedSec / durationSec * 100))
+      : 0;
+
+    await session.updateOne({ endTime, focusRate, completionRate });
 
     // 포인트 지급 시도 — 중도 이탈(abandoned)이면 포인트 미지급
     let pointResult = null;
     let weeklyBonusResult = null;
     const edupoint = await EduPoint.findOne({ studentId: session.studentId });
-    if (!abandoned && edupoint && focusRate >= edupoint.settings.targetRate) {
+    if (!abandoned && completionRate >= COMPLETION_THRESHOLD && edupoint && focusRate >= edupoint.settings.targetRate) {
       pointResult = await awardPoints(session._id, focusRate, edupoint);
       if (!pointResult) {
         // 목표 달성했으나 학부모 잔액 부족 — pointEarned: 0으로 기록 (null과 구분)
@@ -262,6 +272,7 @@ async function endSession(req, res) {
       ...session.toObject(),
       endTime,
       focusRate,
+      completionRate,
       pointEarned: pointResult?.pointEarned || 0,
       studentEarned: pointResult?.studentEarned || null,
       weeklyBonus: weeklyBonusResult?.weeklyBonus || null,

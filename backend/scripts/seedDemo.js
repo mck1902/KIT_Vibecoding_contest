@@ -109,6 +109,7 @@ async function seed() {
       endTime: new Date(sessionStart.getTime() + lec.durationMin * 60 * 1000),
       records,
       departures,
+      completionRate: 100,    // 완강 데모
       ragAnalysis: null, // 첫 조회 시 Claude API 자동 생성
     });
 

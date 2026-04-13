@@ -53,8 +53,8 @@ const ParentDashboard = () => {
       .then(data => {
         if (Array.isArray(data)) {
           setSessions(data);
-          // 종료된 세션 중 가장 최근 것을 기본 선택 (진행중 세션 제외)
-          const ended = data.filter(s => s.endTime);
+          // 완강(completionRate >= 90) 세션 중 가장 최근 것을 기본 선택
+          const ended = data.filter(s => !!s.endTime && (s.completionRate ?? 0) >= 90);
           const defaultSession = ended.length > 0 ? ended[0] : data[0];
           if (defaultSession) setSelectedSessionId(defaultSession._id);
         }
@@ -112,7 +112,9 @@ const ParentDashboard = () => {
     ? sessions.filter(s => s.studentId === selectedChild.studentId)
     : sessions;
   const filteredSessions = childSessions.filter(s =>
-    statusFilter === 'ended' ? !!s.endTime : !s.endTime
+    statusFilter === 'ended'
+      ? !!s.endTime && (s.completionRate ?? 0) >= 90
+      : !s.endTime || (s.completionRate ?? 0) < 90
   );
 
   const chartData = report?.chartData?.length > 0 ? report.chartData : [];
@@ -136,7 +138,9 @@ const ParentDashboard = () => {
       : sessions;
     // 자녀 변경 시 statusFilter 유지, 해당 필터에 맞는 첫 세션 선택
     const filtered = target.filter(s =>
-      statusFilter === 'ended' ? !!s.endTime : !s.endTime
+      statusFilter === 'ended'
+        ? !!s.endTime && (s.completionRate ?? 0) >= 90
+        : !s.endTime || (s.completionRate ?? 0) < 90
     );
     selectFirstSession(filtered);
   };
@@ -148,7 +152,9 @@ const ParentDashboard = () => {
     setRagText('');
     setQuizData(null);
     const filtered = childSessions.filter(s =>
-      status === 'ended' ? !!s.endTime : !s.endTime
+      status === 'ended'
+        ? !!s.endTime && (s.completionRate ?? 0) >= 90
+        : !s.endTime || (s.completionRate ?? 0) < 90
     );
     selectFirstSession(filtered);
   };
@@ -252,8 +258,8 @@ const ParentDashboard = () => {
             {/* 완료 / 미완료 토글 */}
             <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--card-border)' }}>
               {[
-                { key: 'ended',   label: '완료', count: childSessions.filter(s => !!s.endTime).length },
-                { key: 'ongoing', label: '미완료', count: childSessions.filter(s => !s.endTime).length },
+                { key: 'ended',   label: '완료',   count: childSessions.filter(s => !!s.endTime && (s.completionRate ?? 0) >= 90).length },
+                { key: 'ongoing', label: '미완료', count: childSessions.filter(s => !s.endTime || (s.completionRate ?? 0) < 90).length },
               ].map(({ key, label, count }) => (
                 <button
                   key={key}

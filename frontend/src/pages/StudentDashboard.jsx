@@ -117,7 +117,7 @@ const StudentDashboard = () => {
           onStateChange: (e) => {
             // 영상 재생 완료 시 자동 세션 종료
             if (e.data === window.YT.PlayerState.ENDED && sessionStartedRef.current) {
-              handleEndSessionRef.current?.();
+              handleEndSessionRef.current?.(false, false, true); // ended=true
             }
             // 일시정지 감지
             if (e.data === window.YT.PlayerState.PAUSED && sessionStartedRef.current) {
@@ -462,7 +462,7 @@ const StudentDashboard = () => {
 
   const MIN_SESSION_SEC = 60; // 리포트 생성 최소 시청 시간 (1분)
 
-  const handleEndSession = async (force = false, abandoned = false) => {
+  const handleEndSession = async (force = false, abandoned = false, ended = false) => {
     if (isEndingRef.current) return;
     isEndingRef.current = true;
 
@@ -476,7 +476,9 @@ const StudentDashboard = () => {
     }
 
     const sid = sessionIdRef.current;
-    const watched = playerRef.current?.getCurrentTime?.() ?? elapsedRef.current;
+    const watched = ended
+      ? (playerRef.current?.getDuration?.() ?? elapsedRef.current)
+      : (playerRef.current?.getCurrentTime?.() ?? elapsedRef.current);
     sessionIdRef.current = null;
     setSessionStarted(false);
 
@@ -485,10 +487,10 @@ const StudentDashboard = () => {
       if (sid) {
         // PUT /end 실패 시 1회 재시도 (네트워크 순단 대비)
         try {
-          endData = await sessionAPI.end(sid, abandoned);
+          endData = await sessionAPI.end(sid, abandoned, Math.round(watched));
         } catch (_) {
           await new Promise(r => setTimeout(r, 1500));
-          endData = await sessionAPI.end(sid, abandoned);
+          endData = await sessionAPI.end(sid, abandoned, Math.round(watched));
         }
       }
       // 포인트 획득 시 축하 모달 표시 후 리포트로 이동

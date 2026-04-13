@@ -9,6 +9,7 @@ const {
   createTestParentWithChild,
   createTestEduPoint,
   createTestSession,
+  createTestLecture,
   makeRecords,
 } = require('../setup');
 
@@ -25,13 +26,15 @@ describe('주간 보너스 테스트', () => {
     const result = await createTestParentWithChild('STU001');
     parent = result.parent;
     token = getStudentToken('STU001');
+    await createTestLecture('LEC001', 1000); // completionRate 계산용 Lecture 픽스처
   });
 
   async function completeSession() {
     const session = await createTestSession('STU001', 'LEC001', makeRecords(1, 10));
     const res = await request(app)
       .put(`/api/sessions/${session._id}/end`)
-      .set('Authorization', `Bearer ${token}`);
+      .set('Authorization', `Bearer ${token}`)
+      .send({ watchedSec: 950 }); // completionRate=95 >= 90 → 포인트 지급 조건 충족
     return res;
   }
 

@@ -41,6 +41,7 @@ const sessionSchema = new mongoose.Schema(
     },
     ragAnalysis: { type: String, default: null },  // 생성 후 캐시 — API 재호출 방지
     focusRate: { type: Number, default: null },
+    completionRate: { type: Number, default: 0 },
     pointEarned: { type: Number, default: null },
     pointAwarded: { type: Boolean, default: false },
   },

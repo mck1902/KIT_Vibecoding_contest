@@ -56,6 +56,11 @@ const createSessionSchema = z.object({
   subject: z.string().max(100).optional().default(''),
 });
 
+const endSessionSchema = z.object({
+  abandoned:  z.boolean().optional().default(false),
+  watchedSec: z.number().finite().min(0).optional().default(0),
+});
+
 const recordObject = z.object({
   timestamp: z.string().datetime({ message: 'timestamp는 ISO 8601 형식이어야 합니다.' }),
   status: z.number().int().min(1).max(5),
@@ -85,6 +90,7 @@ module.exports = {
     link: linkSchema,
     updateProfile: updateProfileSchema,
     createSession: createSessionSchema,
+    endSession: endSessionSchema,
     addRecords: addRecordsSchema,
     addDeparture: addDepartureSchema,
     edupointSettings: z.object({

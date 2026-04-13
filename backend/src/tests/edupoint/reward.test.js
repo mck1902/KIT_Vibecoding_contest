@@ -9,6 +9,7 @@ const {
   createTestParentWithChild,
   createTestEduPoint,
   createTestSession,
+  createTestLecture,
   makeRecords,
 } = require('../setup');
 
@@ -24,16 +25,18 @@ describe('포인트 지급 테스트', () => {
 
   describe('정상 흐름', () => {
     test('목표 달성 → 포인트 지급', async () => {
+      await createTestLecture('LEC001', 1000);
       await createTestEduPoint(parent._id, 'STU001', {
         balance: 10000,
         settings: { targetRate: 50, rewardPerSession: 100, weeklyBonusCount: 5, weeklyBonusReward: 500 },
       });
-      // status 1 (95%) > targetRate 50
+      // status 1 (95%) > targetRate 50, watchedSec=950 → completionRate=95 >= 90
       const session = await createTestSession('STU001', 'LEC001', makeRecords(1, 10));
 
       const res = await request(app)
         .put(`/api/sessions/${session._id}/end`)
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${token}`)
+        .send({ watchedSec: 950 });
 
       expect(res.status).toBe(200);
       expect(res.body.pointEarned).toBe(100);
@@ -54,7 +57,8 @@ describe('포인트 지급 테스트', () => {
 
       const res = await request(app)
         .put(`/api/sessions/${session._id}/end`)
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
 
       expect(res.status).toBe(200);
       expect(res.body.pointEarned).toBe(0);
@@ -68,7 +72,8 @@ describe('포인트 지급 테스트', () => {
 
       const res = await request(app)
         .put(`/api/sessions/${session._id}/end`)
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
 
       expect(res.status).toBe(200);
       expect(res.body.endTime).toBeTruthy();
@@ -78,6 +83,7 @@ describe('포인트 지급 테스트', () => {
 
   describe('중복 지급 방어', () => {
     test('이미 종료된 세션 재호출 → 기존 결과 반환, 포인트 변동 없음', async () => {
+      await createTestLecture('LEC001', 1000);
       await createTestEduPoint(parent._id, 'STU001', {
         balance: 10000,
         settings: { targetRate: 50, rewardPerSession: 100, weeklyBonusCount: 5, weeklyBonusReward: 500 },
@@ -87,12 +93,14 @@ describe('포인트 지급 테스트', () => {
       // 첫 번째 종료
       await request(app)
         .put(`/api/sessions/${session._id}/end`)
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${token}`)
+        .send({ watchedSec: 950 });
 
       // 두 번째 종료 (idempotency)
       const res = await request(app)
         .put(`/api/sessions/${session._id}/end`)
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${token}`)
+        .send({ watchedSec: 950 });
 
       expect(res.status).toBe(200);
 
@@ -101,6 +109,7 @@ describe('포인트 지급 테스트', () => {
     });
 
     test('동시 호출 시뮬레이션 → 1회만 지급', async () => {
+      await createTestLecture('LEC001', 1000);
       await createTestEduPoint(parent._id, 'STU001', {
         balance: 10000,
         settings: { targetRate: 50, rewardPerSession: 100, weeklyBonusCount: 5, weeklyBonusReward: 500 },
@@ -109,8 +118,8 @@ describe('포인트 지급 테스트', () => {
 
       // 동시 호출
       const [res1, res2] = await Promise.all([
-        request(app).put(`/api/sessions/${session._id}/end`).set('Authorization', `Bearer ${token}`),
-        request(app).put(`/api/sessions/${session._id}/end`).set('Authorization', `Bearer ${token}`),
+        request(app).put(`/api/sessions/${session._id}/end`).set('Authorization', `Bearer ${token}`).send({ watchedSec: 950 }),
+        request(app).put(`/api/sessions/${session._id}/end`).set('Authorization', `Bearer ${token}`).send({ watchedSec: 950 }),
       ]);
 
       expect(res1.status).toBe(200);
@@ -126,6 +135,7 @@ describe('포인트 지급 테스트', () => {
 
   describe('잔액 경계값', () => {
     test('잔액 = 보상액 정확히 일치 → 지급 성공, balance = 0', async () => {
+      await createTestLecture('LEC001', 1000);
       await createTestEduPoint(parent._id, 'STU001', {
         balance: 100,
         settings: { targetRate: 50, rewardPerSession: 100, weeklyBonusCount: 5, weeklyBonusReward: 500 },
@@ -134,7 +144,8 @@ describe('포인트 지급 테스트', () => {
 
       const res = await request(app)
         .put(`/api/sessions/${session._id}/end`)
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${token}`)
+        .send({ watchedSec: 950 });
 
       expect(res.body.pointEarned).toBe(100);
       const ep = await EduPoint.findOne({ studentId: 'STU001' });
@@ -142,6 +153,7 @@ describe('포인트 지급 테스트', () => {
     });
 
     test('잔액 < 보상액 (1 부족) → 미지급, 롤백', async () => {
+      await createTestLecture('LEC001', 1000);
       await createTestEduPoint(parent._id, 'STU001', {
         balance: 99,
         settings: { targetRate: 50, rewardPerSession: 100, weeklyBonusCount: 5, weeklyBonusReward: 500 },
@@ -150,7 +162,8 @@ describe('포인트 지급 테스트', () => {
 
       const res = await request(app)
         .put(`/api/sessions/${session._id}/end`)
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${token}`)
+        .send({ watchedSec: 950 });
 
       expect(res.status).toBe(200);
 
@@ -162,6 +175,7 @@ describe('포인트 지급 테스트', () => {
     });
 
     test('잔액 0 → 미지급', async () => {
+      await createTestLecture('LEC001', 1000);
       await createTestEduPoint(parent._id, 'STU001', {
         balance: 0,
         settings: { targetRate: 50, rewardPerSession: 100, weeklyBonusCount: 5, weeklyBonusReward: 500 },
@@ -170,7 +184,8 @@ describe('포인트 지급 테스트', () => {
 
       await request(app)
         .put(`/api/sessions/${session._id}/end`)
-        .set('Authorization', `Bearer ${token}`);
+        .set('Authorization', `Bearer ${token}`)
+        .send({ watchedSec: 950 });
 
       const ep = await EduPoint.findOne({ studentId: 'STU001' });
       expect(ep.balance).toBe(0);

@@ -5,6 +5,7 @@ const Student = require('../models/Student');
 const Parent = require('../models/Parent');
 const EduPoint = require('../models/EduPoint');
 const Session = require('../models/Session');
+const Lecture = require('../models/Lecture');
 
 // 트랜잭션 테스트를 위해 ReplSet 사용
 let replSet;
@@ -121,6 +122,16 @@ function makeRecords(status, count = 10, confidence = 1) {
   }));
 }
 
+async function createTestLecture(lectureId = 'LEC001', durationSec = 1000) {
+  return Lecture.create({
+    lectureId,
+    subject: '테스트과목',
+    title: '테스트강의',
+    youtubeId: 'test-yt-id',
+    durationSec,
+  });
+}
+
 module.exports = {
   getStudentToken,
   getParentToken,
@@ -128,5 +139,6 @@ module.exports = {
   createTestParentWithChild,
   createTestEduPoint,
   createTestSession,
+  createTestLecture,
   makeRecords,
 };

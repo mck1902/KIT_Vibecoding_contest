@@ -19,7 +19,7 @@ const router = express.Router();
 router.post('/', requireAuth, requireRole('student'), validate(schemas.createSession), createSession);
 router.get('/', requireAuth, getSessions);
 router.get('/:id', requireAuth, getSessionById);
-router.put('/:id/end', requireAuth, requireRole('student'), endSession);
+router.put('/:id/end', requireAuth, requireRole('student'), validate(schemas.endSession), endSession);
 router.post('/:id/records', requireAuth, requireRole('student'), validate(schemas.addRecords), addRecords);
 router.post('/:id/departures', requireAuth, requireRole('student'), validate(schemas.addDeparture), addDeparture);
 router.post('/:id/pause-events', requireAuth, requireRole('student'), addPauseEvent);
