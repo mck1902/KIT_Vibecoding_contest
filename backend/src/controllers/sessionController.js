@@ -232,15 +232,16 @@ async function endSession(req, res) {
     }
 
     // 세션 종료 처리
+    const { abandoned = false } = req.body; // 강의 전환 등 중도 이탈 여부
     const endTime = new Date();
     const focusRate = calcAvgFocus(session.records, session.pauseEvents);
     await session.updateOne({ endTime, focusRate });
 
-    // 포인트 지급 시도
+    // 포인트 지급 시도 — 중도 이탈(abandoned)이면 포인트 미지급
     let pointResult = null;
     let weeklyBonusResult = null;
     const edupoint = await EduPoint.findOne({ studentId: session.studentId });
-    if (edupoint && focusRate >= edupoint.settings.targetRate) {
+    if (!abandoned && edupoint && focusRate >= edupoint.settings.targetRate) {
       pointResult = await awardPoints(session._id, focusRate, edupoint);
       if (!pointResult) {
         // 목표 달성했으나 학부모 잔액 부족 — pointEarned: 0으로 기록 (null과 구분)

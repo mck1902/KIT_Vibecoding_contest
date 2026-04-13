@@ -66,9 +66,9 @@ export const sessionAPI = {
   start: (lectureId, subject) =>
     request('POST', '/sessions', { lectureId, subject }),
 
-  /** 세션 종료 */
-  end: (sessionId) =>
-    request('PUT', `/sessions/${sessionId}/end`, {}),
+  /** 세션 종료 — abandoned: true이면 포인트 미지급 (강의 전환 등 중도 이탈) */
+  end: (sessionId, abandoned = false) =>
+    request('PUT', `/sessions/${sessionId}/end`, { abandoned }),
 
   /** 집중도 기록 배열 일괄 저장 */
   addRecords: (sessionId, records) =>

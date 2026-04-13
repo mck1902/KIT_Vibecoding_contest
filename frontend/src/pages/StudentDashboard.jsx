@@ -448,7 +448,7 @@ const StudentDashboard = () => {
 
   const MIN_SESSION_SEC = 60; // 리포트 생성 최소 시청 시간 (1분)
 
-  const handleEndSession = async (force = false) => {
+  const handleEndSession = async (force = false, abandoned = false) => {
     if (isEndingRef.current) return;
     isEndingRef.current = true;
 
@@ -471,10 +471,10 @@ const StudentDashboard = () => {
       if (sid) {
         // PUT /end 실패 시 1회 재시도 (네트워크 순단 대비)
         try {
-          endData = await sessionAPI.end(sid);
+          endData = await sessionAPI.end(sid, abandoned);
         } catch (_) {
           await new Promise(r => setTimeout(r, 1500));
-          endData = await sessionAPI.end(sid);
+          endData = await sessionAPI.end(sid, abandoned);
         }
       }
       // 포인트 획득 시 축하 모달 표시 후 리포트로 이동
@@ -509,7 +509,7 @@ const StudentDashboard = () => {
 
   const handleLectureSelect = async (lec) => {
     if (sessionStarted) {
-      await handleEndSession();
+      await handleEndSession(false, true); // 강의 전환 = 중도 이탈 (포인트 미지급)
     } else {
       analysis.stopAnalysis();
       webcam.stop();
