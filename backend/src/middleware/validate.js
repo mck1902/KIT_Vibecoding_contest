@@ -62,11 +62,15 @@ const addRecordsSchema = z.object({
       timestamp: z.string().datetime({ message: 'timestamp는 ISO 8601 형식이어야 합니다.' }),
       status: z.number().int().min(1).max(5),
       confidence: z.number().min(0).max(1),
+      focusProb: z.number().min(0).max(100).nullable().optional(),
+      videoTime: z.number().min(0).nullable().optional(),
     })).min(1, 'records는 1개 이상이어야 합니다.'),
     z.object({
       timestamp: z.string().datetime(),
       status: z.number().int().min(1).max(5),
       confidence: z.number().min(0).max(1),
+      focusProb: z.number().min(0).max(100).nullable().optional(),
+      videoTime: z.number().min(0).nullable().optional(),
     }),
   ]),
 });
